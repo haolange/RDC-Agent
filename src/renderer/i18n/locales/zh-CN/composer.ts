@@ -87,10 +87,12 @@ export const zhComposer = {
   'composer.permission.full-access': '完全访问',
   'composer.permission.custom': '自定义',
   'composer.permission.defaultDesc': '工作区常规操作直接执行，外部或高风险操作先询问',
-  'composer.permission.auto-reviewDesc': '已验证的低风险操作自动通过，其余操作独立审查；明确审批限制仍生效',
+  'composer.permission.auto-reviewDesc':
+    '计划已批准且核验通过的操作直接执行，其余操作独立审查，审查无法判断时询问你；明确审批限制仍生效',
   'composer.permission.full-accessDesc': '所有操作直接执行，不再询问；只在你完全信任当前任务时使用',
   'composer.permission.customDesc': '按 设置 › 策略 中的可访问目录与命令规则执行',
   'composer.toolApprovalContext': '审批上下文',
+  'composer.toolApprovalEscalated': '自动审查无法确认：{checks}。请决定是否执行这一次。',
   'composer.toolApprovalSubmitFailed': '无法提交审批决定。',
   'composer.agentProfile': 'Agent 配置',
   'composer.commandThemeInvalid': '主题须为 dark、light 或 system。',

@@ -49,8 +49,8 @@
       "complexity": 60
     },
     "src/main/agent-runtime/orchestration/TurnPreparationService.ts": {
-      "lines": 434,
-      "complexity": 51
+      "lines": 418,
+      "complexity": 47
     },
     "src/main/agent-runtime/permissions/AgentPermissionPolicy.ts": {
       "lines": 155,
@@ -73,7 +73,7 @@
       "complexity": 95
     },
     "src/main/agent-runtime/tasks/TaskTools.ts": {
-      "lines": 180,
+      "lines": 175,
       "complexity": 50
     },
     "src/main/agent-runtime/tools/primitives/GrepTool.ts": {
@@ -86,7 +86,7 @@
       "complexity": 57
     },
     "src/main/agent-runtime/workTrace/DelegatedWorkProjection.ts": {
-      "lines": 272,
+      "lines": 267,
       "complexity": 65
     },
     "src/main/agent-trace/TraceService.ts": {
@@ -220,9 +220,6 @@
     "src/renderer/features/composer/EffortMaxField.tsx": {
       "params": 9
     },
-    "src/renderer/features/composer/PlanReviewRequestPanel.tsx": {
-      "lines": 156
-    },
     "src/renderer/features/composer/useComposer.ts": {
       "lines": 159
     },
@@ -277,7 +274,7 @@
       "lines": 179
     },
     "src/renderer/features/settings/SettingsModal/sections/AgentsSettings.tsx": {
-      "lines": 211
+      "lines": 206
     },
     "src/renderer/features/settings/SettingsModal/sections/HooksSettings.tsx": {
       "lines": 169

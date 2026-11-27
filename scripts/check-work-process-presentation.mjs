@@ -11,9 +11,10 @@ import {
 
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
-const { translate } = require('../src/renderer/i18n/messages.ts');
+const { localizedTranslator } = require('../src/renderer/i18n/messages.ts');
 const { formatDuration } = require('../src/renderer/lib/formatTime.ts');
-const t = (key, params) => translate('zh-CN', key, params);
+// The rows format durations with the translator's language, never the machine locale.
+const t = localizedTranslator('zh-CN');
 
 const { buildWorkProcessPresentation } = require(
   path.join(CONTRACT_ROOT, requireRegistered('src/renderer/features/transcript/workProcessTracePresentation.ts')),

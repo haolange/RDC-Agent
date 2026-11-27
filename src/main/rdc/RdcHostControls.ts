@@ -15,7 +15,8 @@ export interface RdcHostControlScope {
   leaseVersion: number;
 }
 
-function readReplayIsolation(scope: RdcHostControlScope, context?: ToolExecutionContext) {
+/** Whether this turn exclusively holds the owning replay through its lease and turn lock. */
+export function readReplayIsolation(scope: RdcHostControlScope, context?: ToolExecutionContext) {
   const unavailable = { available: false as const, reason: 'protected_owning_general_turn_not_verified' };
   const identity = context?.rdcBinding?.identity;
   if (

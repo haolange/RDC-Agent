@@ -1,6 +1,5 @@
 import { RdcExecutionReceipts, rdcExecutionReceipts, type RdcExecutionReceipt } from '../rdc/RdcExecutionReceipts';
 import { rdcDigest } from '../rdc/RdcOperationCatalog';
-import { parseRdcProcessIdentity } from '../rdc/RdcProcessIdentity';
 import { InvestigationError } from './investigationErrors';
 import type { ExperimentRecord } from '@shared/types/renderdocInvestigation';
 
@@ -24,12 +23,12 @@ export function assertExecutionEvidence(
     const phases = ['baseline', 'intervention', 'variant', 'rollback', 'restored'] as const;
     const records = phases.map((phase) => receipts.read(sessionId, refs[phase]));
     const [baseline, intervention, variant, rollback, restored] = records;
-    const processFingerprint = rdcDigest(parseRdcProcessIdentity(baseline.processIdentity));
+    const processFingerprint = rdcDigest(baseline.processIdentity);
     if (new Set(phases.map((phase) => refs[phase].uri)).size !== phases.length)
       throw new Error('receipts must be distinct');
     for (let i = 0; i < records.length; i++) {
       const record = records[i];
-      if (rdcDigest(parseRdcProcessIdentity(record.processIdentity)) !== processFingerprint) {
+      if (rdcDigest(record.processIdentity) !== processFingerprint) {
         throw new Error('daemon/worker process generation changed within the experiment');
       }
       if (

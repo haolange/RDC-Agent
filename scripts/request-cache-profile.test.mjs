@@ -155,3 +155,41 @@ test('rejects a malformed snapshot instead of skipping it', () => {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('keeps permission reviews on their own chain and reports their cache reads apart from the root turn', () => {
+  const rules = { id: 'runtime:permission-review', kind: 'runtime-fact', content: 'review rules' };
+  const authority = { id: 'runtime:permission-review-authority', kind: 'runtime-fact', content: 'plan authority' };
+  const review = (callIndex, action, usage) => ({
+    ...snapshot(callIndex, {
+      segments: [rules, authority],
+      messages: [{ role: 'user', content: action, timestamp: 1 }],
+      tools: [],
+      usage,
+    }),
+    turnId: `permission-review-${callIndex}`,
+    cache: { enabled: true },
+  });
+  const root = [
+    snapshot(0, { segments: [core], messages: [user], usage: { inputTokens: 1000, cacheReadTokens: 0 } }),
+    review(1, 'first action', { inputTokens: 300, cacheReadTokens: 0 }),
+    snapshot(2, {
+      segments: [core],
+      messages: [user, call('a'), result('a', 'z')],
+      usage: { inputTokens: 1100, cacheReadTokens: 1000 },
+    }),
+    review(3, 'second action', { inputTokens: 320, cacheReadTokens: 280 }),
+  ];
+  const { requests, summary } = profileRequests(root);
+  const byKind = (kind) => requests.filter((row) => row.kind === kind);
+  // The interleaved review is not the root's previous request, so the root turn stays append-only.
+  assert.deepEqual(
+    byKind('root').map((row) => row.difference && row.difference.region),
+    [null, 'none'],
+  );
+  assert.deepEqual(
+    byKind('permission-review').map((row) => row.difference && row.difference.region),
+    [null, 'input'],
+  );
+  assert.equal(summary.byKind['permission-review'].cacheReadRatio, 280 / 620);
+  assert.equal(summary.byKind.root.cacheReadRatio, 1000 / 2100);
+});

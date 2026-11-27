@@ -139,6 +139,8 @@ export interface PreparedAgentRuntime {
   mcpConnectionErrors: string[];
   mcpLease: McpConnectionLease | null;
   credentialHandle: string;
+  /** The auto-review route frozen with the turn; it never borrows the turn's own model. */
+  permissionReview: import('../permissions/PermissionReviewRoute').PermissionReviewRoute;
   promptCache: CompiledPromptCache;
   effectivePlan: EffectiveRuntimePlan;
   /** The approved, hash-verified plan for this execution, if present. */
@@ -175,6 +177,8 @@ export interface PreparedAgentTurnContext {
 
 export interface ToolExecutorRuntimeContext {
   reviewPermission?: import('../permissions/PermissionReviewRuntime').PermissionReviewer;
+  /** This turn's admission: host facts decide first, the reviewer only what they leave open. */
+  admission?: import('../permissions/PermissionAdmission').TurnAdmission;
   sessionId?: string | null;
   runId?: string;
   turnId?: string;

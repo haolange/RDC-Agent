@@ -1103,17 +1103,7 @@ describe('file routing across permission modes', () => {
     expect(evaluate()).toMatchObject({
       action: 'auto_review',
       risk: 'medium',
-      operationFacts: {
-        catalogCapabilities: {
-          coverage: 'complete-frozen-catalog',
-          checkedOperations: 3,
-          admittedOperations: 2,
-          deniedOperations: 1,
-          admittedEffects: ['shader_replacement'],
-          isNativeStateObservation: false,
-        },
-        rollbackContracts: [rollback],
-      },
+      operationFacts: { operation: replacement.name, effects: ['shader_replacement'] },
     });
     expect(discovery({ kind: 'describe', operation: unknownWriter.name }).action).toBe('allow');
     expect(

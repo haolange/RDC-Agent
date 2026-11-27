@@ -386,7 +386,7 @@ export class SubagentRunner implements SubagentToolHost {
         : '';
       const artifactReferences = delegatedArtifactReferences(subagentSessionId) ?? [];
       const artifactInput = artifactReferences.length
-        ? `Runtime-frozen artifact references (URI, SHA-256):\n${artifactReferences.map((ref) => `${ref.uri} ${ref.hash}`).join('\n')}\n`
+        ? `Runtime-granted artifact references (read by URI; each is bound to its granted version):\n${artifactReferences.map((ref) => ref.uri).join('\n')}\n`
         : '';
       const childInput = artifactInput + closureNote + renderDelegationCapsuleInput(frozenCapsule) + taskContract;
       if (ownerSessionId)

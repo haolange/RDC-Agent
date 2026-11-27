@@ -1,5 +1,6 @@
 import { isAutomaticToolApproval } from '@shared/utils/toolApproval';
 import type { ConversationMessage } from '@shared/types/conversation';
+import type { AdmissionCheck } from '@shared/constants/admissionChecks';
 
 export interface PendingToolApprovalRequest {
   sessionId: string | null;
@@ -10,6 +11,8 @@ export interface PendingToolApprovalRequest {
   question: string;
   risk: 'low' | 'medium' | 'high';
   reviewer?: string;
+  /** The checks an auto-review could not establish before handing this action to the user. */
+  escalatedChecks?: AdmissionCheck[];
 }
 
 export const findPendingToolApproval = (messages: ConversationMessage[]): PendingToolApprovalRequest | null => {
@@ -40,6 +43,7 @@ export const findPendingToolApproval = (messages: ConversationMessage[]): Pendin
             ? toolCall.approval.risk
             : 'medium') as PendingToolApprovalRequest['risk'],
           reviewer: toolCall.approval.reviewer,
+          ...(toolCall.approval.escalatedFrom ? { escalatedChecks: toolCall.approval.escalatedFrom.failedChecks } : {}),
         };
       }
     }

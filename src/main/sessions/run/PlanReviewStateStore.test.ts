@@ -1,8 +1,9 @@
 import { mkdir, mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StorageIo } from '../../runtime/StorageIo';
+import { executionOfferStore } from '../store/sessionStores';
 import { PlanReviewStateStore } from './PlanReviewStateStore';
 
 describe('PlanReviewStateStore', () => {
@@ -46,6 +47,16 @@ describe('PlanReviewStateStore', () => {
     expect(nextCycle.newCycle).toBe(true);
     expect(nextCycle.planId).not.toBe(first.planId);
     expect(nextCycle.revision).toBe(1);
+  });
+  it("withdraws the approved offer, and with it the plan's authorized interventions, when a revision begins", async () => {
+    roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdc-plan-state-')));
+    const clear = vi.spyOn(executionOfferStore, 'clear').mockImplementation(() => undefined);
+    try {
+      createStore().beginRevision('sess', 'turn-a');
+      expect(clear).toHaveBeenCalledWith('sess');
+    } finally {
+      clear.mockRestore();
+    }
   });
   it('rejects invalid documents', async () => {
     roots.push(await mkdtemp(path.join(os.tmpdir(), 'rdc-plan-state-')));

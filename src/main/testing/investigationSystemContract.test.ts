@@ -675,26 +675,21 @@ describe('investigation system contract', () => {
     expect.hasAssertions();
     const { resolver, service } = createInvestigationHarness();
     const note = seedNote(resolver);
+    const current = (recordKey: string) => {
+      const entry = service
+        .list(SESSION_ID)
+        .find((item) => item.recordKey === recordKey && item.status !== 'superseded');
+      return entry ? service.readRecord(SESSION_ID, entry.artifactId) : undefined;
+    };
     writeDraft(service, 'world_state', baselineWorld('ws-base'));
-    const variant = writeDraft(service, 'world_state', exclusiveWorld('ws-var'));
+    // The variant is observed before its experiment exists: judged polluted, its Evidence stale.
+    const variant = writeDraft(service, 'world_state', exclusiveWorld('ws-var', true));
+    expect(variant.record).toMatchObject({ validity: 'polluted' });
+    const variantEvidence = writeDraft(service, 'evidence', evidenceOf('ws-var', note, 'ev-var'));
+    expect(variantEvidence.record).toMatchObject({ stale: true });
     writeDraft(service, 'world_state', baselineWorld('ws-restored'));
     writeDraft(service, 'claim', hypothesisClaim('ws-base'));
     writeDraft(service, 'evidence', evidenceOf('ws-restored', note, 'ev-rdc'));
-    writeDraft(
-      service,
-      'experiment',
-      recordedExperiment({
-        hypothesisClaimId: 'claim-hyp',
-        baselineWorldStateId: 'ws-base',
-        variantWorldStateId: 'ws-var',
-        restoredWorldStateId: 'ws-restored',
-        verifyEvidenceIds: ['ev-rdc'],
-      }),
-    );
-    const isolated = writeDraft(service, 'world_state', exclusiveWorld('ws-var', true), {
-      supersedes: variant.manifest.artifactId,
-    });
-    expect(isolated.record).toMatchObject({ validity: 'valid' });
     expect(() =>
       writeDraft(
         service,
@@ -709,6 +704,32 @@ describe('investigation system contract', () => {
         }),
       ),
     ).toThrow(/INVESTIGATION_REF_UNRESOLVED|S-RDC-01/);
+    expect(current('ws-var')?.record).toMatchObject({ validity: 'polluted' });
+    // Closing the experiment with verified rollback judges S-RDC-01 again in the same transaction.
+    writeDraft(
+      service,
+      'experiment',
+      recordedExperiment({
+        hypothesisClaimId: 'claim-hyp',
+        baselineWorldStateId: 'ws-base',
+        variantWorldStateId: 'ws-var',
+        restoredWorldStateId: 'ws-restored',
+        verifyEvidenceIds: ['ev-rdc'],
+      }),
+    );
+    expect(current('ws-var')).toMatchObject({
+      record: { validity: 'valid' },
+      manifest: { supersedes: variant.manifest.artifactId },
+    });
+    expect(current('ev-var')).toMatchObject({
+      record: { stale: false },
+      manifest: { supersedes: variantEvidence.manifest.artifactId },
+    });
+    expect(service.readRecord(SESSION_ID, variant.manifest.artifactId)).toMatchObject({
+      record: { validity: 'polluted' },
+      manifest: { status: 'superseded' },
+    });
+    // Without an exclusive lock the closure does not isolate the change.
     const polluted = writeDraft(service, 'world_state', {
       ...exclusiveWorld('ws-dirty', true),
       replay: { adapter: 'vk', driver: 'adreno', device: 'device-0', exclusiveLock: false },
@@ -716,6 +737,20 @@ describe('investigation system contract', () => {
     expect(polluted.record).toMatchObject({ validity: 'polluted' });
     const stale = writeDraft(service, 'evidence', evidenceOf('ws-dirty', note, 'ev-stale'));
     expect(stale.record).toMatchObject({ stale: true });
+    writeDraft(
+      service,
+      'experiment',
+      recordedExperiment({
+        experimentId: 'exp-unlocked',
+        hypothesisClaimId: 'claim-hyp',
+        baselineWorldStateId: 'ws-base',
+        variantWorldStateId: 'ws-dirty',
+        restoredWorldStateId: 'ws-restored',
+        verifyEvidenceIds: ['ev-rdc'],
+      }),
+    );
+    expect(current('ws-dirty')?.record).toMatchObject({ validity: 'polluted' });
+    expect(current('ev-stale')?.record).toMatchObject({ stale: true });
   });
 
   it('investigation.contract.non-invasion', () => {

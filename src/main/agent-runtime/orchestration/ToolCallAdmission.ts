@@ -58,7 +58,7 @@ export interface ValidatedToolCall {
   args: Record<string, unknown>;
 }
 
-export type DenyTool = (reason?: string) => Promise<ToolResultMessage>;
+export type DenyTool = (reason?: string, details?: object) => Promise<ToolResultMessage>;
 export type AdmissionGate<T> =
   { ok: true; value: T } | { ok: false; result: ToolResultMessage | Promise<ToolResultMessage> };
 

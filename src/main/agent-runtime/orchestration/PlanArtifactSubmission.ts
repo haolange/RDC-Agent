@@ -5,6 +5,7 @@
  */
 
 import { AppError } from '@shared/errors/appError';
+import { agentAccessCeiling } from '@shared/types/agentManifest';
 import { isHandoffContinueAction } from '../interactions/handoffSurface';
 import { agentPlanReviewRequestService } from '../interactions/AgentPlanReviewRequestService';
 import { assertDeclaredHandoffForPlan } from '../interactions/applyDeclaredHandoff';
@@ -12,6 +13,11 @@ import { composePlanMarkdown, planArtifactWriter, sectionsFromMarkdown } from '.
 import { planReviewStateStore } from '../../sessions/run/PlanReviewStateStore';
 import { projectWorkspaceStore, sessionRecordStore } from '../../sessions/store/sessionStores';
 import { prepareInvestigationPlan } from '../../rdc/prepareInvestigationPlan';
+import { preparePlanAuthorizations } from '../../rdc/rdcInterventionAuthorization';
+import { getRdcTurnBinding } from '../../rdc/RdcTurnBindings';
+import { rdcCliInvokerService } from '../../rdc/RdcCliInvokerService';
+import { resolveEnabledAgentDefinition } from '../../settings/agent-manifests/effectiveAgentSnapshot';
+import { isToolDeniedByPolicy, resolvePolicyApprovalFloor } from '../permissions/PolicyCompiler';
 import { rdcSessionService } from '../../rdc/RdcSessionService';
 import { TaskRegistry, createSessionTaskStore, getDelegatedTaskScope } from '../tasks';
 import { preparePlanTaskRequirements } from '../tasks/TaskExecutionRequirements';
@@ -20,6 +26,7 @@ import type { AgentRole } from '@shared/types/agent';
 import type { ToolCallContent, ToolResultMessage } from '../core/types';
 import type { TurnHandle } from './TurnCoordinator';
 import type { ActiveTurnLookup, ToolExecutorRuntimeContext } from './orchestratorTypes';
+import type { RdcOperationDefinition } from '../../rdc/RdcOperationCatalog';
 
 /** One plan_artifact call: the call, the submitting Agent and the turn's runtime context. */
 export interface PlanArtifactToolCall {
@@ -178,27 +185,54 @@ async function freezePlanTaskRequirements(
   return registry ? await preparePlanTaskRequirements(registry, requiredTaskIds as string[], args.taskRevisions) : [];
 }
 
-/** An investigation plan freezes its mission contract and the capture scope it may use. */
+/** An investigation plan freezes its mission contract, the capture scope it may use and the interventions approved. */
 async function freezePlanInvestigation(submission: PlanSubmission): Promise<PlanInvestigation> {
   const { args, sessionId, runtimeContext } = submission;
   const sourcePlan = runtimeContext.effectivePlan;
   if (args.captureScope !== undefined && (!sourcePlan || sourcePlan.completionContract !== 'investigation-report')) {
     throw new AppError('PLAN_CAPTURE_SCOPE_INVALID', 'capture scope requires an investigation plan.');
   }
-  return sourcePlan?.completionContract === 'investigation-report' && sourcePlan.investigationMission
-    ? await prepareInvestigationPlan({
-        mission: sourcePlan.investigationMission,
-        sessionId,
-        projectId: runtimeContext.projectId ?? sourcePlan.projectId,
-        captureScope: args.captureScope,
-        host: {
-          sessionProjectId: (id) => sessionRecordStore.readSessionRecord(id)?.projectId ?? null,
-          project: (id) => projectWorkspaceStore.getProjectById(id),
-          replayState: (owner, projectId) =>
-            rdcSessionService.snapshotReplayForSession({ sessionId: owner, projectId }),
-        },
-      })
-    : null;
+  const contract =
+    sourcePlan?.completionContract === 'investigation-report' && sourcePlan.investigationMission
+      ? await prepareInvestigationPlan({
+          mission: sourcePlan.investigationMission,
+          sessionId,
+          projectId: runtimeContext.projectId ?? sourcePlan.projectId,
+          captureScope: args.captureScope,
+          host: {
+            sessionProjectId: (id) => sessionRecordStore.readSessionRecord(id)?.projectId ?? null,
+            project: (id) => projectWorkspaceStore.getProjectById(id),
+            replayState: (owner, projectId) =>
+              rdcSessionService.snapshotReplayForSession({ sessionId: owner, projectId }),
+          },
+        })
+      : null;
+  if (args.authorizations === undefined) return contract;
+  if (!contract || !sourcePlan)
+    throw new AppError('PLAN_AUTHORIZATION_INVALID', 'interventions can be authorized only in an investigation plan.');
+  const projectRoot = runtimeContext.projectRootPath ?? sourcePlan.projectRootPath ?? null;
+  return {
+    ...contract,
+    authorizations: preparePlanAuthorizations({
+      proposals: args.authorizations,
+      definitions: await frozenCatalog(sourcePlan),
+      targetsHaveFullCeiling: submission.handoffOptions.every(
+        (handoff) => agentAccessCeiling(resolveEnabledAgentDefinition(handoff.agent, projectRoot)) === 'full',
+      ),
+      policyAllowsReview:
+        !isToolDeniedByPolicy(sourcePlan.policy, 'shell') &&
+        resolvePolicyApprovalFloor(sourcePlan.policy, 'shell', 'mutation') !== 'user',
+      hasCaptureScope: Boolean(contract.captureScope),
+    }),
+  };
+}
+
+/** The tool catalog the planning turn froze; without an open replay, the same configured catalog. */
+async function frozenCatalog(plan: NonNullable<ToolExecutorRuntimeContext['effectivePlan']>) {
+  const binding = getRdcTurnBinding(plan);
+  if (!binding?.cli.enabled) return [];
+  if (binding.definitions.length) return binding.definitions as readonly RdcOperationDefinition[];
+  return (await rdcCliInvokerService.loadCatalog(binding.cli)).tools as readonly RdcOperationDefinition[];
 }
 
 /** The declared handoffs must accept the plan; then the live plan is written and the user reviews it. */
@@ -233,6 +267,7 @@ async function submitPlanForReview(
     sections: sectionsFromMarkdown(markdown),
     status: 'awaiting' as const,
     handoffOptions,
+    ...(investigation?.authorizations ? { authorizations: investigation.authorizations } : {}),
   };
   const answer = await agentPlanReviewRequestService.request({
     agentId,

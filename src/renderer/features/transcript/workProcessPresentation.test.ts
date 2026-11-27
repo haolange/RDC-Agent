@@ -90,6 +90,61 @@ it.each([
   },
 );
 
+it.each([
+  [['source-bound', 'baseline-recorded'], undefined, '未通过：源已绑定、基线已记录'],
+  [[], 'PERMISSION_REVIEW_TIMEOUT', '审核未及时答复，操作未执行。'],
+] as const)(
+  'reads a refused auto-review as its named checks %j or the review failure %s',
+  (failedChecks, errorCode, message) => {
+    const row = createToolRowForPresentation(
+      {
+        id: 'refused',
+        toolName: 'shell',
+        status: 'error',
+        startedAt: now,
+        approval: {
+          approvalId: 'auto-review-refused',
+          status: 'rejected',
+          reviewer: 'auto_review',
+          reviewMethod: 'model',
+          verdict: 'deny',
+          failedChecks: [...failedChecks],
+          errorCode,
+          reason: 'The replacement at sha256:0123456789abcdef0123 is unbound.',
+          requestedAt: now,
+        },
+      },
+      t,
+    );
+    if (row.type !== 'tool') throw new Error('Expected tool row');
+    expect(row.approval?.message).toBe(message);
+  },
+);
+
+it('shows a user approval handed over by an undecidable auto-review as such, with what it could not confirm', () => {
+  const row = createToolRowForPresentation(
+    {
+      id: 'escalated',
+      toolName: 'shell',
+      status: 'pending',
+      startedAt: now,
+      approval: {
+        approvalId: 'tool-approval-escalated',
+        status: 'pending',
+        risk: 'medium',
+        reason: 'Owned replay shader change requires authorization review.',
+        escalatedFrom: { reviewer: 'auto_review', reviewMethod: 'model', failedChecks: ['baseline-recorded'] },
+        requestedAt: now,
+      },
+    },
+    t,
+  );
+  if (row.type !== 'tool') throw new Error('Expected tool row');
+  expect(row.approval?.message).toBe('自动审查无法确认：基线已记录');
+  expect(row.approval?.metaLines).toContain('自动审查无法判断 · 询问你');
+  expect(row.approval?.metaLines).not.toContain('人工审批');
+});
+
 it('keeps a post-approval native error separate from an operation-preflight rejection', () => {
   const row = createToolRowForPresentation(
     {

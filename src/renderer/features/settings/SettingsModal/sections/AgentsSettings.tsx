@@ -22,7 +22,7 @@ import { AgentManifestDiagnostics } from './AgentManifestDiagnostics';
 import { AgentDefaultModelSection } from './AgentDefaultModelSection';
 import { AgentReviewDialogs } from './AgentReviewDialogs';
 import { NewAgentDialog } from './NewAgentDialog';
-import { DEFAULT_MODEL_TARGET, useAgentModelControls, type AgentModelCommands } from './useAgentModelControls';
+import { useAgentModelControls, type AgentModelCommands } from './useAgentModelControls';
 import { useAgentModelOptions } from './useAgentModelOptions';
 import type { AgentProvenanceScope } from './agentConfigStatus';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
@@ -156,12 +156,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
 
   return (
     <div className={`settings-manifest-page${detailRequested && selectedAgent ? ' is-detail-open' : ''}`}>
-      <AgentDefaultModelSection
-        settings={settings}
-        modelOptions={modelOptions}
-        error={models.modelError?.target === DEFAULT_MODEL_TARGET ? models.modelError.message : null}
-        onChange={models.setDefaultField}
-      />
+      <AgentDefaultModelSection settings={settings} modelOptions={modelOptions} models={models} />
       <AgentsPageToolbar
         scope={scope}
         canProject={canProject}

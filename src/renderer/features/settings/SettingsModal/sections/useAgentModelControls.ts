@@ -15,8 +15,9 @@ import type { AgentBuiltinDiffState } from './AgentBuiltinDiffDialog';
 import type { AgentOverrideDeleteTarget } from './AgentOverrideDeleteDialog';
 import type { ProjectAgentTrustReview } from './ProjectAgentTrustDialog';
 
-/** Where a failed model write is reported: the default row, or one Agent's editor. */
+/** Where a failed model write is reported: the default row, the auto-review row, or one Agent's editor. */
 export const DEFAULT_MODEL_TARGET = '';
+export const REVIEW_MODEL_TARGET = ':auto-review';
 
 export interface AgentModelCommands {
   onAgentModelOps: (ops: SettingsPatchOp[]) => Promise<void>;
@@ -31,6 +32,11 @@ const defaultFieldOp = (change: AgentModelFieldChange): SettingsPatchOp =>
   change.field === 'model'
     ? { op: 'agentModels.setDefault', field: 'model', value: change.value ?? null }
     : { op: 'agentModels.setDefault', field: 'reasoningLevel', value: change.value ?? null };
+
+const reviewFieldOp = (change: AgentModelFieldChange): SettingsPatchOp =>
+  change.field === 'model'
+    ? { op: 'agentModels.setReview', field: 'model', value: change.value ?? null }
+    : { op: 'agentModels.setReview', field: 'reasoningLevel', value: change.value ?? null };
 
 const agentFieldOp = (agentId: string, change: AgentModelFieldChange): SettingsPatchOp => {
   if (change.value === undefined) return { op: 'agentModels.clearAgentField', agentId, field: change.field };
@@ -57,6 +63,8 @@ export function useAgentModelControls(commands: AgentModelCommands) {
   };
 
   const setDefaultField = (change: AgentModelFieldChange) => commit(defaultFieldOp(change), DEFAULT_MODEL_TARGET);
+
+  const setReviewField = (change: AgentModelFieldChange) => commit(reviewFieldOp(change), REVIEW_MODEL_TARGET);
 
   const setAgentField = (agentId: string, change: AgentModelFieldChange) =>
     commit(agentFieldOp(agentId, change), agentId);
@@ -110,6 +118,7 @@ export function useAgentModelControls(commands: AgentModelCommands) {
   return {
     modelError,
     setDefaultField,
+    setReviewField,
     setAgentField,
     builtinDiff,
     showBuiltinDiff,

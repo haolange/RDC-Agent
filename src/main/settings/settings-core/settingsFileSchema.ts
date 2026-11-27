@@ -138,6 +138,7 @@ const AgentModelsSchema: z.ZodType<AgentModelSettings> = z
   .object({
     default: AgentModelBindingSchema,
     byAgent: z.record(text.refine(isSafeAgentProfileId, 'expected an Agent id'), AgentModelBindingSchema),
+    review: AgentModelBindingSchema.optional(),
   })
   .strict();
 

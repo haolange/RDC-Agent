@@ -89,10 +89,11 @@ export const enComposer = {
   'composer.permission.custom': 'Custom',
   'composer.permission.defaultDesc': 'Workspace routine actions run; external or risky actions ask first.',
   'composer.permission.auto-reviewDesc':
-    'Verified low-risk actions pass automatically; other actions receive independent review. Explicit approval restrictions still apply.',
+    'Actions the approved plan covers and the host verifies run; others get an independent review, and you decide what it cannot. Explicit approval restrictions still apply.',
   'composer.permission.full-accessDesc': 'Every action runs without asking. Use it only when you fully trust the task.',
   'composer.permission.customDesc': 'Follows the access roots and command rules in Settings › Policy.',
   'composer.toolApprovalContext': 'Approval context',
+  'composer.toolApprovalEscalated': "Auto-review couldn't confirm: {checks}. Decide whether to run it this once.",
   'composer.toolApprovalSubmitFailed': 'Unable to submit the approval decision.',
   'composer.agentProfile': 'Agent profile',
   'composer.commandThemeInvalid': 'Theme must be dark, light, or system.',

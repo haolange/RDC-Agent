@@ -1,6 +1,11 @@
 import { cancelWorkTrace } from '@shared/conversation/cancelWorkTrace';
 import { loopTextItems, loopThinkingItems, sameProviderBlock, settleTextPhase } from '@shared/conversation/loopItems';
 import { nowMs } from '@shared/utils/id';
+import {
+  isAdmissionCheck,
+  isPermissionReviewVerdict,
+  parseToolApprovalEscalation,
+} from '@shared/constants/admissionChecks';
 import { normalizeToolName } from '../orchestration/RuntimeToolPolicy';
 import { normalizeWorkBlockKind, providerOutputRefKey } from '../../sessions/store/StoredWorkTrace';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
@@ -79,11 +84,25 @@ function cloneToolCall(toolCall: ConversationToolCall): ConversationToolCall {
             ...(option.labelTranslations ? { labelTranslations: { ...option.labelTranslations } } : {}),
           })),
           decision: toolCall.planReview.decision ? { ...toolCall.planReview.decision } : undefined,
+          authorizations: toolCall.planReview.authorizations?.map((item) => ({ ...item, target: { ...item.target } })),
         }
       : undefined,
     resourceRefs: toolCall.resourceRefs?.map((resource) => ({ ...resource })),
     imagePreviews: toolCall.imagePreviews?.map((preview) => ({ ...preview })),
-    approval: toolCall.approval ? { ...toolCall.approval } : undefined,
+    approval: toolCall.approval
+      ? {
+          ...toolCall.approval,
+          ...(toolCall.approval.failedChecks ? { failedChecks: [...toolCall.approval.failedChecks] } : {}),
+          ...(toolCall.approval.escalatedFrom
+            ? {
+                escalatedFrom: {
+                  ...toolCall.approval.escalatedFrom,
+                  failedChecks: [...toolCall.approval.escalatedFrom.failedChecks],
+                },
+              }
+            : {}),
+        }
+      : undefined,
   };
 }
 
@@ -552,6 +571,9 @@ export function upsertRuntimeToolApproval(
     risk?: unknown;
     reviewer?: unknown;
     reviewMethod?: unknown;
+    verdict?: unknown;
+    failedChecks?: unknown;
+    escalatedFrom?: unknown;
     errorCode?: unknown;
     answer?: unknown;
   },
@@ -576,6 +598,10 @@ export function upsertRuntimeToolApproval(
   const reviewer = stringifyApprovalField(input.reviewer);
   if (reviewer) approval.reviewer = reviewer as NonNullable<ConversationToolCall['approval']>['reviewer'];
   if (input.reviewMethod === 'rule' || input.reviewMethod === 'model') approval.reviewMethod = input.reviewMethod;
+  if (isPermissionReviewVerdict(input.verdict)) approval.verdict = input.verdict;
+  if (Array.isArray(input.failedChecks)) approval.failedChecks = input.failedChecks.filter(isAdmissionCheck);
+  const escalatedFrom = parseToolApprovalEscalation(input.escalatedFrom);
+  if (escalatedFrom) approval.escalatedFrom = escalatedFrom;
   if (typeof input.errorCode === 'string' && input.errorCode) approval.errorCode = input.errorCode;
   const answer = stringifyApprovalField(input.answer);
   if (answer) approval.answer = answer;

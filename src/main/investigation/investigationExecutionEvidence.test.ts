@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { rdcDigest } from '../rdc/RdcOperationCatalog';
-import { RdcExecutionReceipts } from '../rdc/RdcExecutionReceipts';
+import { RdcExecutionReceipts, type RdcExecutionReceipt } from '../rdc/RdcExecutionReceipts';
 import { createInvestigationHarness, recordedExperiment, SESSION_ID } from '../testing/investigationTestFixtures';
 import { seedExecutionEvidence } from '../testing/investigationExecutionFixtures';
 import { assertExecutionEvidence } from './investigationExecutionEvidence';
@@ -25,10 +25,10 @@ describe('native execution evidence', () => {
     (scenario) => {
       const { store, experiment } = harness();
       experiment.executionEvidence = seedExecutionEvidence(store, SESSION_ID, experiment.experimentId, (records) => {
-        if (scenario === 'missing') delete records[2].processIdentity;
-        else if (scenario === 'daemon-restarted') records[2].processIdentity!.daemon.pid = 41;
-        else if (scenario === 'worker-restarted') records[2].processIdentity!.worker.pid = 42;
-        else records[2].processIdentity!.worker.start_generation = 'windows-filetime:201';
+        if (scenario === 'missing') delete (records[2] as Partial<RdcExecutionReceipt>).processIdentity;
+        else if (scenario === 'daemon-restarted') records[2].processIdentity.daemon.pid = 41;
+        else if (scenario === 'worker-restarted') records[2].processIdentity.worker.pid = 42;
+        else records[2].processIdentity.worker.start_generation = 'windows-filetime:201';
       });
       expect(() => assertExecutionEvidence(SESSION_ID, experiment, store)).toThrow(/process|PROCESS_IDENTITY/);
     },

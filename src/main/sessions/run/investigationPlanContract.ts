@@ -1,10 +1,33 @@
 import { z } from 'zod';
 import { AppError } from '@shared/errors/appError';
-import { PLAN_INVESTIGATION_HEADING } from '@shared/types/planInvestigation';
+import {
+  PLAN_AUTHORIZATION_MAX_INSTANCES,
+  PLAN_AUTHORIZATION_REVERSIBILITY,
+  PLAN_INVESTIGATION_HEADING,
+  type PlanAuthorization,
+} from '@shared/types/planInvestigation';
 import { PLAN_TASK_REQUIREMENTS_HEADING } from '@shared/types/taskExecution';
 
 const id = z.string().trim().min(1).max(256);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
+
+/** One approved intervention, frozen with the plan the user reviewed (see `PlanAuthorization`). */
+export const PlanAuthorizationSchema: z.ZodType<PlanAuthorization> = z
+  .object({
+    operation: z.string().regex(/^rd[.][a-z_]+[.][a-z0-9_]+$/),
+    target: z
+      .object({
+        eventId: z.number().int().nonnegative().optional(),
+        stage: z.string().trim().min(1).max(32).optional(),
+        shaderId: z.string().trim().min(1).max(256).optional(),
+      })
+      .strict()
+      .refine((target) => Object.keys(target).length > 0, 'An authorization names at least one target field.'),
+    effect: z.string().regex(/^[a-z_]+$/),
+    reversibility: z.enum(PLAN_AUTHORIZATION_REVERSIBILITY),
+    maxInstances: z.number().int().min(1).max(PLAN_AUTHORIZATION_MAX_INSTANCES),
+  })
+  .strict();
 
 /** Main-generated facts included in the plan the user reviews and approves. */
 export const InvestigationPlanContractSchema = z
@@ -22,12 +45,16 @@ export const InvestigationPlanContractSchema = z
       })
       .strict()
       .optional(),
+    authorizations: z.array(PlanAuthorizationSchema).min(1).max(16).optional(),
   })
   .strict()
   .superRefine((value, context) => {
     const inputs = value.captureScope?.inputs ?? [];
     if (new Set(inputs.map((input) => input.inputId)).size !== inputs.length) {
       context.addIssue({ code: 'custom', message: 'Capture input IDs must be unique.' });
+    }
+    if (value.authorizations && !value.captureScope) {
+      context.addIssue({ code: 'custom', message: 'Authorized interventions require a capture scope.' });
     }
   });
 

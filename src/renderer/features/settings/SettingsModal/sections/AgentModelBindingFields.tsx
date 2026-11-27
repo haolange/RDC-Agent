@@ -19,22 +19,35 @@ export interface AgentModelFallback {
 export type AgentModelFieldChange =
   { field: 'model'; value?: string } | { field: 'reasoningLevel'; value?: ReasoningSelection };
 
-interface AgentModelBindingFieldsProps {
+export interface AgentModelControlProps {
   binding: AgentModelBinding;
   options: AgentModelOption[];
-  /** Present for one Agent: an empty field means "use the default". Absent for the default itself. */
+  /** Present when an empty field means "use the default". Absent for the default itself. */
   fallback?: AgentModelFallback;
   onChange: (change: AgentModelFieldChange) => void;
-  testIdPrefix: string;
 }
 
-/** Model and reasoning level; each field is set or left to the fallback on its own. */
-export const AgentModelBindingFields: React.FC<AgentModelBindingFieldsProps> = ({
+/** The binding's model; with a fallback, the first choice follows the fallback model and clears the field. */
+export const AgentModelSelect: React.FC<AgentModelControlProps> = ({ binding, options, fallback, onChange }) => {
+  const { t } = useI18n();
+  const fallbackModelLabel = modelOptionLabel(fallback?.model, options) ?? t('settings.agentModelNotSet');
+  return (
+    <AgentModelCascadeSelect
+      value={binding.model ?? ''}
+      options={options}
+      followDefaultLabel={fallback ? t('settings.agentModelUseDefault', { model: fallbackModelLabel }) : undefined}
+      onChange={(model) => onChange({ field: 'model', value: model || undefined })}
+    />
+  );
+};
+
+/** The binding's reasoning level, offering the levels its effective model lists. */
+export const AgentReasoningSelect: React.FC<AgentModelControlProps & { testId: string }> = ({
   binding,
   options,
   fallback,
   onChange,
-  testIdPrefix,
+  testId,
 }) => {
   const { t } = useI18n();
   const effectiveModel = binding.model ?? fallback?.model;
@@ -46,39 +59,42 @@ export const AgentModelBindingFields: React.FC<AgentModelBindingFieldsProps> = (
       ...(binding.reasoningLevel ? [binding.reasoningLevel] : []),
     ]),
   ];
-  const fallbackModelLabel = modelOptionLabel(fallback?.model, options) ?? t('settings.agentModelNotSet');
   const levelLabel = (level: string): string => (isReasoningLevelLabel(level) ? t(EFFORT_LABEL_KEYS[level]) : level);
+  return (
+    <Select
+      ariaLabel={t('settings.agentReasoningLevel')}
+      dataTestId={testId}
+      value={binding.reasoningLevel ?? ''}
+      onChange={(value) =>
+        onChange({ field: 'reasoningLevel', value: value ? (value as ReasoningSelection) : undefined })
+      }
+      options={[
+        {
+          value: '',
+          label: !fallback
+            ? t('settings.agentReasoningDefault')
+            : fallback.reasoningLevel
+              ? t('settings.agentReasoningUseDefault', { level: levelLabel(fallback.reasoningLevel) })
+              : t('settings.agentReasoningFollowDefault'),
+        },
+        ...reasoningChoices.map((value) => ({ value, label: levelLabel(value) })),
+      ]}
+    />
+  );
+};
 
+/** One Agent's model and reasoning level, each under its own label; an empty field uses the default. */
+export const AgentModelBindingFields: React.FC<
+  AgentModelControlProps & { fallback: AgentModelFallback; testIdPrefix: string }
+> = ({ testIdPrefix, ...control }) => {
+  const { t } = useI18n();
   return (
     <div className="settings-agent-route-grid">
       <SettingsField label={t('settings.modelFieldLabel')} className="settings-model-route-row">
-        <AgentModelCascadeSelect
-          value={binding.model ?? ''}
-          options={options}
-          followDefaultLabel={fallback ? t('settings.agentModelUseDefault', { model: fallbackModelLabel }) : undefined}
-          onChange={(model) => onChange({ field: 'model', value: model || undefined })}
-        />
+        <AgentModelSelect {...control} />
       </SettingsField>
       <SettingsField label={t('settings.agentReasoningLevel')}>
-        <Select
-          ariaLabel={t('settings.agentReasoningLevel')}
-          dataTestId={`${testIdPrefix}-reasoning-level`}
-          value={binding.reasoningLevel ?? ''}
-          onChange={(value) =>
-            onChange({ field: 'reasoningLevel', value: value ? (value as ReasoningSelection) : undefined })
-          }
-          options={[
-            {
-              value: '',
-              label: !fallback
-                ? t('settings.agentReasoningDefault')
-                : fallback.reasoningLevel
-                  ? t('settings.agentReasoningUseDefault', { level: levelLabel(fallback.reasoningLevel) })
-                  : t('settings.agentReasoningFollowDefault'),
-            },
-            ...reasoningChoices.map((value) => ({ value, label: levelLabel(value) })),
-          ]}
-        />
+        <AgentReasoningSelect {...control} testId={`${testIdPrefix}-reasoning-level`} />
       </SettingsField>
     </div>
   );

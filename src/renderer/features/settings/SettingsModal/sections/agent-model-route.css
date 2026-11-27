@@ -78,18 +78,68 @@
   }
 }
 
-/* Default model: an ordinary settings row above the scope switch, not a banner. */
+/*
+ * Model routes above the scope switch: ordinary settings rows, not a banner. One grid owns the columns and each row
+ * is a subgrid, so the default and auto-review pickers line up under one pair of column labels.
+ */
 .settings-agent-defaults {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  --settings-agent-defaults-model: min(18rem, 30%);
+  --settings-agent-defaults-level: min(11rem, 24%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--settings-agent-defaults-model) var(--settings-agent-defaults-level);
+  column-gap: var(--space-4);
   flex: 0 0 auto;
-  padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--token-border-muted);
 }
 
-.settings-agent-defaults > .settings-field.is-row {
-  align-items: start;
+.settings-agent-defaults-head,
+.settings-agent-defaults-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+
+.settings-agent-defaults-head {
+  color: var(--token-text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: var(--leading-tight);
+}
+
+.settings-agent-defaults-head > :first-child {
+  grid-column: 2;
+}
+
+.settings-agent-defaults-row {
+  row-gap: var(--space-2);
+  padding-block: var(--space-3);
+}
+
+.settings-agent-defaults-head + .settings-agent-defaults-row {
+  padding-block-start: var(--space-2);
+}
+
+.settings-agent-defaults-row + .settings-agent-defaults-row {
+  border-top: 1px solid var(--token-border-subtle);
+}
+
+.settings-agent-defaults-error {
+  grid-column: 1 / -1;
+}
+
+/* Narrow panels: the label spans the row and the two pickers share its width below, still under the column labels. */
+@container settings-panel (max-width: 36rem) {
+  .settings-agent-defaults {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+
+  .settings-agent-defaults-head > :first-child {
+    grid-column: 1;
+  }
+
+  .settings-agent-defaults-row > .settings-field-copy {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Facts about one Agent profile file shown before acting on it (delete, trust). */

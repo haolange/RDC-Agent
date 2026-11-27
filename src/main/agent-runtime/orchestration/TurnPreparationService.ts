@@ -31,6 +31,7 @@ import { sessionContextJournal } from '../context/SessionContextJournal';
 import { agentRuntimeConfigService } from '../../settings/agent-manifests/AgentRuntimeConfigService';
 import { mcpDescriptorHash } from '../../settings/settings-core/McpTrustService';
 import { settingsService } from '../../settings/settings-core/SettingsService';
+import { freezePermissionReviewRoute } from '../permissions/PermissionReviewRoute';
 import { agentSlotKey } from './AgentSlotRegistry';
 import { resolveExecutionScopeId } from './executionScope';
 import { combineActiveSkillAllowlists, isToolAllowedByFrozenAllowlist } from './RuntimeToolPolicy';
@@ -38,6 +39,7 @@ import { isMcpPrefixedToolName, partitionDeferredTools, preactivateWorkflowTools
 import {
   countContinuationDecisions,
   type FrozenAttachmentManifestEntry,
+  type PreparedAgentRuntime,
   type PreparedAgentTurnContext,
   type RuntimeToolResolver,
 } from './orchestratorTypes';
@@ -178,29 +180,8 @@ export class TurnPreparationService {
       turnSettings.agentRuntime.context.compactionThresholdPercent,
       compiledPolicy.contextCompactionPercent,
     );
-    const approvedExecutionOffer = approvedExecutionOfferForAgent(input.sessionId, input.agentId);
-    const offerSegment = promptPlan.segments.find((segment) => segment.id === 'runtime:approved-execution-offer');
-    if (
-      Boolean(approvedExecutionOffer) !== Boolean(offerSegment) ||
-      (approvedExecutionOffer &&
-        offerSegment?.sourceHash !== hashScopedResource(approvedExecutionOfferFact(approvedExecutionOffer)))
-    ) {
-      throw new AppError('APPROVED_PLAN_CHANGED', 'rebuild the prompt and preparation for the current plan.');
-    }
-    const approvedExecution =
-      approvedExecutionOffer && input.sessionId
-        ? {
-            offer: structuredClone(approvedExecutionOffer),
-            investigation: approvedInvestigationContract(
-              approvedExecutionOffer,
-              planArtifactWriter.readMarkdown(
-                input.sessionId,
-                approvedExecutionOffer.plan.uri,
-                approvedExecutionOffer.plan.hash,
-              ).markdown,
-            ),
-          }
-        : null;
+    const approvedExecution = freezeApprovedExecution(input.sessionId, input.agentId, promptPlan);
+    const approvedExecutionOffer = approvedExecution?.offer ?? null;
     const profile = {
       ...input.effectiveProfile,
       skills: [
@@ -535,6 +516,11 @@ export class TurnPreparationService {
           mcpConnectionErrors,
           mcpLease,
           credentialHandle: input.credentialHandle,
+          permissionReview: freezePermissionReviewRoute({
+            agentModels: turnSettings.agentModels,
+            providers: settingsService.providerConnections,
+            projectRootPath: input.projectRootPath,
+          }),
           promptCache,
           effectivePlan,
           approvedExecution,
@@ -545,6 +531,33 @@ export class TurnPreparationService {
       throw error;
     }
   }
+}
+
+/**
+ * The approved, hash-verified plan this turn executes, if any. The prompt must carry exactly the offer the session
+ * holds; otherwise preparation is stale and must be rebuilt.
+ */
+function freezeApprovedExecution(
+  sessionId: string | null | undefined,
+  agentId: string,
+  promptPlan: PromptPlan,
+): PreparedAgentRuntime['approvedExecution'] {
+  const offer = approvedExecutionOfferForAgent(sessionId, agentId);
+  const offerSegment = promptPlan.segments.find((segment) => segment.id === 'runtime:approved-execution-offer');
+  if (
+    Boolean(offer) !== Boolean(offerSegment) ||
+    (offer && offerSegment?.sourceHash !== hashScopedResource(approvedExecutionOfferFact(offer)))
+  ) {
+    throw new AppError('APPROVED_PLAN_CHANGED', 'rebuild the prompt and preparation for the current plan.');
+  }
+  if (!offer || !sessionId) return null;
+  return {
+    offer: structuredClone(offer),
+    investigation: approvedInvestigationContract(
+      offer,
+      planArtifactWriter.readMarkdown(sessionId, offer.plan.uri, offer.plan.hash).markdown,
+    ),
+  };
 }
 
 /**

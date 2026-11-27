@@ -351,7 +351,7 @@ it.each([
       };
       await dispatch('review-first', [source.uri], capsule.budget);
       expect(sendProfileMessage.mock.calls[0]![1]).toContain(
-        `Runtime-frozen artifact references (URI, SHA-256):\n${source.uri} ${source.hash}\n`,
+        `Runtime-granted artifact references (read by URI; each is bound to its granted version):\n${source.uri}\n`,
       );
       const first = (await registry.listExecutions(review.id))[0]!;
       expect(first).toMatchObject({
@@ -376,7 +376,7 @@ it.each([
       }
       await dispatch('review-retry', [source.uri, raw.uri], { maxToolCalls: 12, maxWallTimeMs: 120_000 });
       expect(sendProfileMessage.mock.calls[1]![1]).toContain(
-        `Runtime-frozen artifact references (URI, SHA-256):\n${source.uri} ${source.hash}\n${raw.uri} ${raw.hash}\n`,
+        `Runtime-granted artifact references (read by URI; each is bound to its granted version):\n${source.uri}\n${raw.uri}\n`,
       );
       const executions = await registry.listExecutions(review.id);
       const second = executions.find((item) => item.generation === 2)!;

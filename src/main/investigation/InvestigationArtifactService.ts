@@ -17,6 +17,7 @@ import { SessionArtifactResolver, sessionArtifactResolver } from '../sessions/ar
 import { formatInvestigationContentHash } from './investigationHash';
 import { readCompleteInvestigationArtifact } from './investigationArtifactRead';
 import { assertExecutionEvidence } from './investigationExecutionEvidence';
+import { collectClosureIsolation } from './investigationClosureIsolation';
 import { InvestigationError, isInvestigationStoreDegraded, toInvestigationError } from './investigationErrors';
 import {
   collectStalePropagation,
@@ -222,6 +223,18 @@ export class InvestigationArtifactService {
         mutations.push(...stale.mutations);
         workingIndex = stale.index;
       }
+    }
+    if (kindEntry.kind === 'experiment') {
+      const closure = collectClosureIsolation({
+        experiment: parsed as ExperimentRecord,
+        lookup,
+        reader: mutationReader,
+        index: workingIndex,
+        artifactId: () => generateEventId('invart'),
+        now: manifest.createdAt,
+      });
+      mutations.push(...closure.mutations);
+      workingIndex = closure.index;
     }
     if (requestedReady) assertReadySourcesUnchanged(sourceRefs, workingIndex);
     mutations.push({ uri: contentUri, text: contentText, role: 'content' });

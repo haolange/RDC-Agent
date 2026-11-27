@@ -13,7 +13,7 @@ import { AppError } from '@shared/errors/appError';
 import { childScopePrefix, isTransientScopeId } from '@shared/utils/executionScope';
 import { appPathService } from '../../runtime/AppPathService';
 import { FileTaskStore, MemoryTaskStore, type TaskStore } from './TaskStore';
-import { verifyTaskReviewArtifact } from './TaskReviewArtifact';
+import { currentTaskReviewArtifactHash } from './TaskReviewArtifact';
 
 /** 将 sessionId 归一化为文件系统安全的目录名。 */
 function safeSegment(sessionId: string): string {
@@ -46,10 +46,10 @@ export function createSessionTaskStore(sessionId: string): FileTaskStore {
       const { readApprovedPlanTasks } = await import('../../sessions/run/ApprovedPlanTasks');
       return readApprovedPlanTasks(sessionId);
     },
-    async (uri, hash) => {
+    async (uri) => {
       const { sessionArtifactResolver } = await import('../../sessions/artifacts/SessionArtifactResolver');
       const { investigationArtifactService } = await import('../../investigation/InvestigationArtifactService');
-      return verifyTaskReviewArtifact(sessionId, uri, hash, sessionArtifactResolver, investigationArtifactService);
+      return currentTaskReviewArtifactHash(sessionId, uri, sessionArtifactResolver, investigationArtifactService);
     },
     async (epoch, preparation) => {
       try {

@@ -1,22 +1,24 @@
 import type { SessionArtifactResolver } from '../../sessions/artifacts/SessionArtifactResolver';
 import type { InvestigationArtifactService } from '../../investigation/InvestigationArtifactService';
 
-/** Verify the actual reviewed bytes and, for investigation records, their current lifecycle status. */
-export function verifyTaskReviewArtifact(
+/**
+ * The current hash of a reviewable result, read by the host from its owning session: the bytes the reference names now,
+ * and for an investigation record only while it is the live version. Null when the reference names nothing reviewable.
+ */
+export function currentTaskReviewArtifactHash(
   sessionId: string,
   uri: string,
-  hash: string,
   resolver: Pick<SessionArtifactResolver, 'read'>,
   investigation: Pick<InvestigationArtifactService, 'list' | 'readRecord'>,
-): boolean {
+): string | null {
   try {
-    if (resolver.read(sessionId, uri, { expectedHash: hash, limit: 1 }).hash !== hash) return false;
-    if (!uri.startsWith('session://investigation/records/')) return true;
+    const hash = resolver.read(sessionId, uri, { limit: 1 }).hash;
+    if (!uri.startsWith('session://investigation/records/')) return hash;
     const entry = investigation.list(sessionId).find((item) => item.contentUri === uri);
-    if (!entry || (entry.status !== 'ready' && entry.status !== 'draft')) return false;
+    if (!entry || (entry.status !== 'ready' && entry.status !== 'draft')) return null;
     const current = investigation.readRecord(sessionId, entry.artifactId, hash);
-    return current.manifest.status === 'ready' || current.manifest.status === 'draft';
+    return current.manifest.status === 'ready' || current.manifest.status === 'draft' ? hash : null;
   } catch {
-    return false;
+    return null;
   }
 }

@@ -181,7 +181,8 @@ export class ToolExecutorFactory {
     onExecutionStart?: (permissionState?: RuntimePermissionState) => void,
   ): Promise<ToolResultMessage> {
     const { agentId, runtimeContext, sessionId } = scope;
-    const denyTool: DenyTool = (reason) => this.createPolicyDeniedToolResult(toolCall, agentId, reason, runtimeContext);
+    const denyTool: DenyTool = (reason, details) =>
+      this.createPolicyDeniedToolResult(toolCall, agentId, reason, runtimeContext, details);
     const admitted = admitToolCall(this.deps, scope, toolCall, denyTool);
     if (!admitted.ok) return admitted.result;
     const tool = admitted.value;
@@ -358,7 +359,7 @@ export class ToolExecutorFactory {
                       onEvent: runtimeContext.onEvent,
                     }
                   : undefined,
-              reviewer: runtimeContext?.reviewPermission,
+              review: runtimeContext,
               executionBudget: policyBudget,
               assertLive,
             },
@@ -408,7 +409,7 @@ export class ToolExecutorFactory {
       if (error instanceof ToolPermissionDenied)
         return error.requiresApproval
           ? this.createApprovalRequiredToolResult(toolCall, agentId, error.message)
-          : denyTool(error.message);
+          : denyTool(error.message, error.details);
       await this.triggerRuntimeHooks('tool.on-error', agentId, runtimeContext, {
         toolName: toolCall.name,
         toolCallId: toolCall.id,
@@ -605,6 +606,7 @@ export class ToolExecutorFactory {
     agentId: AgentRole,
     reason?: string,
     runtimeContext?: ToolExecutorRuntimeContext,
+    details?: object,
   ): Promise<ToolResultMessage> {
     const message = reason || `Policy denied tool "${toolCall.name}" for ${agentId}.`;
     await this.triggerRuntimeHooks('permission.denied', agentId, runtimeContext, {
@@ -623,6 +625,7 @@ export class ToolExecutorFactory {
         },
       ],
       isError: true,
+      ...(details ? { details } : {}),
       timestamp: Date.now(),
     };
   }

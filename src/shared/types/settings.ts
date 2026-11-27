@@ -604,6 +604,8 @@ export interface AgentModelBinding {
 export interface AgentModelSettings {
   default: AgentModelBinding;
   byAgent: Record<string, AgentModelBinding>;
+  /** The auto-review model; absent, or an omitted field, follows the default binding. */
+  review?: AgentModelBinding;
 }
 
 export interface AppSettings {
@@ -661,12 +663,18 @@ export type SettingsPatchOp =
       { field: 'model'; value: string | null } | { field: 'reasoningLevel'; value: ReasoningSelection | null }
     ))
   | ({ op: 'agentModels.setAgentField'; agentId: string } & AgentModelBindingField)
-  | { op: 'agentModels.clearAgentField'; agentId: string; field: AgentModelBindingField['field'] };
+  | { op: 'agentModels.clearAgentField'; agentId: string; field: AgentModelBindingField['field'] }
+  /** Sets one field of the auto-review binding; null clears it so the default applies again. */
+  | ({ op: 'agentModels.setReview' } & (
+      { field: 'model'; value: string | null } | { field: 'reasoningLevel'; value: ReasoningSelection | null }
+    ));
 
 /** The Agent model bindings a patch changed; null means the Agent no longer has its own binding. */
 export interface AgentModelChanges {
   default?: AgentModelBinding;
   byAgent?: Record<string, AgentModelBinding | null>;
+  /** null means the auto-review follows the default binding again. */
+  review?: AgentModelBinding | null;
 }
 
 /** What `settings:patch` committed: each changed section as stored, and only the Agent model bindings it changed. */

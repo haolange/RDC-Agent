@@ -1,4 +1,5 @@
 import type { ManifestTextTranslations } from './agentManifest';
+import type { PlanAuthorization } from './planInvestigation';
 import type { ConversationTurnControls } from './modelCapability';
 import type { SessionModelOverride, SessionRecordSnapshot, SessionRevision } from './session';
 
@@ -45,6 +46,8 @@ export interface ConversationPlanReview {
   status: PlanReviewStatus;
   decision?: PlanReviewDecision;
   handoffOptions: PlanReviewHandoffOption[];
+  /** The interventions approving this plan authorizes, as the host validated and froze them. */
+  authorizations?: PlanAuthorization[];
 }
 
 export interface PlanReadRequest {

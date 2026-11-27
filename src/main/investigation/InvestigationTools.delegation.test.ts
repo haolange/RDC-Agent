@@ -20,10 +20,7 @@ describe('delegated investigation writes', () => {
     try {
       const tools = createInvestigationTools('version-reader', { service });
       const read = tools.find((tool) => tool.name === 'investigation_read')!;
-      const result = await read.execute('read', {
-        artifactId: revised.manifest.artifactId,
-        expectedHash: revised.contentHash,
-      });
+      const result = await read.execute('read', { artifactId: revised.manifest.artifactId });
       expect(result.isError).not.toBe(true);
       expect(result.content[0]).toMatchObject({
         text: expect.stringContaining(
@@ -143,7 +140,7 @@ describe('delegated investigation writes', () => {
       const list = await tools.find((tool) => tool.name === 'investigation_list')!.execute('list', {});
       const read = await tools
         .find((tool) => tool.name === 'investigation_read')!
-        .execute('read', { artifactId: cited.manifest.artifactId, expectedHash: cited.contentHash });
+        .execute('read', { artifactId: cited.manifest.artifactId });
       const other = await tools
         .find((tool) => tool.name === 'investigation_read')!
         .execute('other', { artifactId: unrelated.manifest.artifactId });

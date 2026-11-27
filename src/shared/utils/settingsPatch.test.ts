@@ -7,6 +7,7 @@ import {
   diffAgentModels,
   type SettingsPatchView,
 } from './settingsPatch';
+import { resolvePermissionReviewModel } from './agentModelRoute';
 import type { AgentModelSettings } from '../types/settings';
 
 const view = (): SettingsPatchView => {
@@ -48,6 +49,24 @@ describe('settings patch ops', () => {
       field: 'reasoningLevel',
     });
     expect(models.byAgent).toEqual({});
+  });
+
+  it('sets the auto-review binding field by field, follows the default when cleared, and carries it in changes', () => {
+    const start: AgentModelSettings = { default: { model: 'a:main', reasoningLevel: 'medium' }, byAgent: {} };
+    let models = applyAgentModelOp(start, { op: 'agentModels.setReview', field: 'model', value: 'b:review' });
+    expect(models.review).toEqual({ model: 'b:review' });
+    expect(resolvePermissionReviewModel(models)).toMatchObject({
+      route: { providerId: 'b', modelId: 'review' },
+      reasoningLevel: 'medium',
+      source: 'agent',
+    });
+    const changes = diffAgentModels(start, models);
+    expect(changes).toEqual({ review: { model: 'b:review' } });
+    expect(applyAgentModelChanges(start, changes!)).toEqual(models);
+    models = applyAgentModelOp(models, { op: 'agentModels.setReview', field: 'model', value: null });
+    expect(models).not.toHaveProperty('review');
+    expect(resolvePermissionReviewModel(models)).toMatchObject({ route: { modelId: 'main' }, source: 'default' });
+    expect(diffAgentModels({ ...start, review: { model: 'b:review' } }, models)).toEqual({ review: null });
   });
 
   it('keeps edits of different Agents and fields made from the same starting point', () => {

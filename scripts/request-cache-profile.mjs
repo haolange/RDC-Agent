@@ -304,13 +304,16 @@ export function profileRequests(snapshots) {
   const requests = [];
   for (const [scope, list] of byScope) {
     list.sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.callIndex - right.callIndex);
-    let previous;
+    // Each kind is its own request chain: an interleaved review or compaction is not the root's previous request.
+    const previousByKind = new Map();
     for (const snapshot of list) {
       const items = canonicalItems(snapshot);
       const usage = snapshot.usage ?? {};
+      const kind = scopeKind(snapshot);
+      const previous = previousByKind.get(kind);
       requests.push({
         scope,
-        kind: scopeKind(snapshot),
+        kind,
         turn: snapshot.turnId ?? null,
         callIndex: snapshot.callIndex,
         createdAt: snapshot.createdAt,
@@ -326,7 +329,7 @@ export function profileRequests(snapshots) {
         composition: composition(snapshot),
         difference: previous ? firstDifference(previous.items, items) : null,
       });
-      previous = { items };
+      previousByKind.set(kind, { items });
     }
   }
   return { requests, summary: summarize(requests) };

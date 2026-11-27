@@ -64,7 +64,7 @@ Scoped Runtime Resolution
 `PromptPlan` 每段含 id、kind、scope、source path/hash、precedence、content、token estimate、`stable|volatile`。
 
 - 会话回合与 profile/子执行回合都经同一 `buildTurnPromptPlan`（`src/main/agent-runtime/orchestration/TurnPromptPlan.ts`）解析分层指令、预载 skill 并按 skill 收窄工具；调用方只负责解析 profile 与冻结事实。
-- 能力探测、压缩交接与权限审核这三类不带会话历史、不执行工具的单次请求统一走 `executeAuxiliaryRequest`（`src/main/agent-runtime/prompt/AuxiliaryRequest.ts`），共用请求快照、路由、凭据与缓存规则（只有探测写入 prompt cache），请求被取消则不记录完成。
+- 能力探测、压缩交接与权限审核这三类不带会话历史、不执行工具的单次请求统一走 `executeAuxiliaryRequest`（`src/main/agent-runtime/prompt/AuxiliaryRequest.ts`），共用请求快照、路由、凭据与缓存规则，请求被取消则不记录完成。压缩不写 prompt cache；探测按路由的真实缓存行为写入；权限审核使用 Settings 中的审核模型路由（不沿用回合路由），并以独立的缓存亲和写入自己的稳定前缀。
 - 压缩与权限审核不提供工具；探测提供一个无副作用的 `capability_check`，由调用方判读回执。
 - 稳定前缀指纹锚定 prompt-cache。
 - Session 重建路径：`conversation.jsonl` + `conversation-branches.json` + `session-context.jsonl`。
@@ -542,6 +542,7 @@ Task 可声明严格类型的 `executionRequirements`（`mode: direct|subagent`�
 
 - 准备记录实际 Profile 来源/hash、Skill、模型/推理与被审成果版本；独立审查须读取获授的当前成果。
 - 省略要求不代表历史记录已证明独立性。
+- `plan_artifact.authorizations` 声明计划批准的可逆干预，由计划门按静态策略校验后随调查合同冻结，见 [permissions.md](permissions.md)「自动审查」。
 - `plan_artifact.requiredTaskIds` 从所属 TaskStore 生成目标、依赖与要求快照并纳入批准 hash；本规划回合创建的 Task 仍为 pending／blocked 时，必须显式传入必需 Task ID 或空数组，正文提及 Task 不自动建立绑定，也不把所有 Task 猜成必需。
 - 提交审阅前核对独立来源 Task 存在且不是审查任务自身，执行时仍核对实际成果版本。
 - 批准绑定不能通过修改 Task、换同义 Task 或旧结果削弱，改变义务须走原计划修订。
@@ -553,7 +554,7 @@ Task 可声明严格类型的 `executionRequirements`（`mode: direct|subagent`�
 - 结算重复验证 runtime 产生的准备证明、结果来源和必需输出，模型不能通过结果或 metadata 自报执行证明。
 - 材料可读和实际读取范围分别验证；科学正确性与审查完整性仍由领域方法和验收判断，不从 mode、空 Challenge 或 completed 标签推断。
 
-已被 `independentOfTaskIds` 引用的来源任务在完成结算前，须在执行结果中提供可核验的 `resultRef` 和 `resultHash`；正文中提及引用不能替代这两个字段。缺失或不匹配时保留当前执行以便修正。若审查关系是在来源完成后建立，而该成果缺少结构化引用，则来源投影为待重验，允许在原任务上开启新执行代次并保留原结果与预算；不得事后改写原执行。
+已被 `independentOfTaskIds` 引用的来源任务在完成结算前，须在执行结果中提供可核验的 `resultRef`，由主进程读取其当前字节并绑定 `resultHash`；正文中提及引用不能替代该字段；引用不指向当前会话结果时拒绝结算并保留当前执行以便修正。委派中的子执行按 URI 读取获授材料，版本由授予记录绑定，自填的 hash 被拒绝。若审查关系是在来源完成后建立，而该成果缺少结构化引用，则来源投影为待重验，允许在原任务上开启新执行代次并保留原结果与预算；不得事后改写原执行。
 
 运行时核对所选引用的可读性、内容 hash、来源执行代次和授予范围；它不能仅凭这些事实判断模型所选引用在语义上确实是待审成果。
 
@@ -726,7 +727,7 @@ Agent 只绑定同安装捆绑 Python（按宿主布局，见 docs/architecture/
 
 任务依赖准入与等待投影共用 taskDependencyWait：依赖须 completed/disposition=completed，需要执行的任务还须匹配当前任务 ID、revision、currentExecutionId 的 completed 执行与结果。waitingOn 只描述 pending 的依赖等待，不转换为 blocked，不放宽准入。事件快照在已有写锁中读取任务/执行，右栏通过一致性读取获取同一对数据，不嵌套存储锁。blockedBy 表示先后依赖；正常等待不应写成 blocked。
 
-独立权限审核见 [permissions.md](permissions.md)「独立权限审核」；硬性 policy/user floor、Task 准入、Skill 工具交集与 owning lease 均不被审核批准替代。有效 profile 的声明交接及 requiredSkillIds 必须呈现在 PromptPlan，批准后的声明变更需重新审阅，不能沿用旧 offer 改写准备合同。
+自动审查见 [permissions.md](permissions.md)「自动审查」；硬性 policy/user floor、Task 准入、Skill 工具交集与 owning lease 均不被准入或审核批准替代。有效 profile 的声明交接及 requiredSkillIds 必须呈现在 PromptPlan，批准后的声明变更需重新审阅，不能沿用旧 offer 改写准备合同。
 
 
 ## 工具权限最终准入

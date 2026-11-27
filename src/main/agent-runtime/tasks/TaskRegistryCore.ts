@@ -55,6 +55,16 @@ export class TaskRegistryCore {
     this.options = options;
   }
 
+  /** The host-resolved hash of a result reference; a reference naming no reviewable result is refused. */
+  async resolveResultReference(uri: string): Promise<string> {
+    const hash = await this.store.reviewArtifactHash?.(uri);
+    if (!hash)
+      throw new Error(
+        'The result reference names no current session result. Settle with the exact session:// URI the result was saved under.',
+      );
+    return hash;
+  }
+
   async getExecution(id: string): Promise<TaskExecutionRecord | null> {
     return this.store.loadExecution(id);
   }
@@ -164,7 +174,7 @@ export class TaskRegistryCore {
       if (result && JSON.stringify(result) !== JSON.stringify(execution.result)) {
         if (await canReexecuteInvalidatedTask(task, this.store)) {
           throw new TaskCompletionUnavailable(
-            'Task completion result cannot replace the execution owner result; start a new execution and settle it with a verifiable resultRef and resultHash.',
+            'Task completion result cannot replace the execution owner result; start a new execution and settle it with a verifiable resultRef.',
           );
         }
         throw new TaskCompletionUnavailable('Task completion result cannot replace the execution owner result.');

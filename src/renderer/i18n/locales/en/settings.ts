@@ -413,6 +413,9 @@ export const enSettings = {
   'settings.agentReasoningDefault': 'Model default',
   'settings.agentDefaultModelTitle': 'Default model',
   'settings.agentDefaultModelHint': 'Agents without their own model or reasoning level use these.',
+  'settings.agentReviewModelTitle': 'Auto-review model',
+  'settings.agentReviewModelHint':
+    'Decides, in Auto-review, whether a tool call stays within what you approved. Uses the default model until set.',
   'settings.agentModelNotSet': 'not set',
   'settings.agentModelUseDefault': 'Follow default ({model})',
   'settings.agentReasoningFollowDefault': 'Follow default',
