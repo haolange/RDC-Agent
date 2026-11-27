@@ -16,7 +16,7 @@ General 执行已批准的调查计划时用这份方法：读冻结的计划和
 3. **选下一项检查**。在合法、可执行的检查里选最能改变判断的一项，说清它区分哪几条解释。结果回来后更新谁被支持、削弱、排除或暂缓。符合预测只增加支持，不单独证明因果。
 4. **在决策点记录**。探索阶段沿带 hash 的工具回执推进；到锚点确立、解释集合成形、实验设计与关闭、准备交付这些节点，再用 `investigation_*` 写记录。Checkpoint 的 `unresolvedFrontier` 写还没执行的有效检查。
 5. **请独立核验**。形成拟接受的定位、归因或因果主张后派发审查；没有主张时不做空审查。
-6. **继续或交付**。计划内还有合法且有区分力的检查就继续，"下一步还没查"不是阻塞。确实不能继续时交付 partial，逐项写缺口、试过的路径、挡住的条件和恢复条件；一次无副作用的拒绝不等于能力不可用。
+6. **继续或交付**。计划内还有合法且有区分力的检查就继续，"下一步还没查"不是阻塞。确实不能继续时交付 partial，逐项写缺口、试过的路径、挡住的条件和恢复条件。
 
 ## 续跑与循环
 
@@ -27,15 +27,15 @@ General 执行已批准的调查计划时用这份方法：读冻结的计划和
 
 ## 现场与实验
 
-- **切换与恢复**：跨 capture 用计划批准的 inputId 经 `rdc_probe` 的 `capture_select` 切换。`runtime_context.captureRestoration` 是入口基线，不是当前事件，当前位置要实际查询。结束前调用 `capture_restore` 并检查 `restoration.restored`；终态回执由主进程在提交前签发。
-- **故障**：现场被隔离时关闭中断的实验，用 `capture_recover` 在相同输入、设备和权限下重开，离线分析照常继续。中断实验的旧阶段不与新现场拼接；同一故障再现就停止重开，改做其他检查或如实交付。
+- **切换与恢复**：跨 capture 用计划批准的 inputId 经 `rdc_probe` 的 `capture_select` 切换。`runtime_context.captureRestoration` 是入口基线，不是当前事件，当前位置要实际查询。结束前调用 `capture_restore` 并检查 `restoration.restored`。
+- **故障**：现场被隔离时关闭中断的实验，用 `capture_recover` 重开，离线分析照常继续。中断实验的旧阶段不与新现场拼接；同一故障再现就停止重开，改做其他检查或如实交付。
 - **取图**：临时路径读不到、当前事件没有普通颜色目标，都不等于图像取不到；用观察或导出能力（例如 `rd.session.observe` 的最终输出）写到有权限的位置再读取。坐标以原生纹理为准。
-- **实验**：干预要真实执行并恢复。experimentId 绑定 baseline → intervention → variant → rollback → restored 五份签名回执，记在 Experiment 的 `executionEvidence` 里（取法见 $rdc-tool-shell）。撤销前保存变体现场需要的图像、参数和替换枚举。干预有语义依据、范围受限、预测可区分并能恢复就可以做，不要求事先证明它全局最小；对象与源材料的绑定、修改边界和恢复条件要先成立。
-- 在计划边界内用 `task_create`／`task_update` 调整 Tasks，领域字段不写进 TaskRecord；用户没有要求时不写持久 Memory／Knowledge。
+- **实验**：干预要真实执行并恢复。experimentId 绑定 baseline → intervention → variant → rollback → restored 五份签名回执，记在 Experiment 的 `executionEvidence` 里（取法见 $rdc-tool-shell）。撤销前保存变体现场需要的图像、参数和替换枚举。干预有语义依据、范围受限、预测可区分并能恢复就可以做，不要求事先证明它全局最小。
+- 在计划边界内用 `task_create`／`task_update` 调整 Tasks；用户没有要求时不写持久 Memory／Knowledge。
 
 ## 委派与独立审查
 
-单次 lookup、必要抽查及低成本操作由 General 直接完成。需要隔离时按职责委派：知识综合用 knowledge-scout，机制与候选检查用 generator，Shader、Pass、Resource、Pixel 分析用对应的 analyst，独立审查用 verifier，报告组织按需用 report-writer。General 负责实时回放操作和整合，子级只处理获授的材料；每次 `subagent` 委派的 Capsule 写什么见 execution-orchestrator。
+单次 lookup、必要抽查及低成本操作由 General 直接完成。需要隔离时按职责委派：知识综合用 knowledge-scout，机制与候选检查用 generator，Shader、Pass、Resource、Pixel 分析用对应的 analyst，独立审查用 verifier，报告组织按需用 report-writer。General 负责实时回放操作和整合；每次 `subagent` 委派的 Capsule 写什么见 execution-orchestrator。
 
 计划要求的工作在所属 Task 的 `executionRequirements` 里声明执行方式；义务需要变更时，停止并 join 受影响的执行，经 `plan_artifact.taskRevisions` 修订同一 Task。
 
@@ -54,9 +54,11 @@ General 执行已批准的调查计划时用这份方法：读冻结的计划和
 
 General 的终答就是交付，按这个顺序写：
 
-1. **结论**：第一句写证据支持的最强结论，后面跟一个等级标签，取自结论所依 Claim 的 `verification`：`[Observed]`、`[Reconstructed]`、`[Differential-Supported]`、`[Replay-Counterfactual]`；没有经过验证的陈述标 `[Inferred]` 或 `[Unresolved]`。实验合格（定义见 $debugger-causal-method）时，结论就写成因果，不再加"支持""可能"之类的限定。
+1. **结论**：第一句写证据支持的最强结论，后面跟一个等级标签，取自结论所依 Claim 的 `verification`：`[Observed]`、`[Reconstructed]`、`[Differential-Supported]`、`[Replay-Counterfactual]`；没有经过验证的陈述标 `[Inferred]` 或 `[Unresolved]`。实验合格（定义见 $debugger-causal-method）时，结论就写成因果。一条结论一个标签，要点里不重复限定语。
 2. **证据**：关键读数、实验前后的对比、审查结果。
 3. **未知项与未覆盖的范围**：单独成段，放在结论之后。
 4. **现场与后续**：现场是否已恢复，是否需要用户决定。
+
+工具被准入层拒绝时，看结果里每个检查项的 `remedy`：`agent` 项补上再试；其余是宿主或用户的前置条件，如实交付 partial 并写明出口（人工批准或调整权限模式），不写成证据不足。
 
 在会话内写 WorldState、Claim、Checkpoint 和 ready Report。核验、Challenge 与现场恢复闭合后，用报告 URI/hash 声明 completed；受阻如实声明 partial 或 blocked。
