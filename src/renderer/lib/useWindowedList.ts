@@ -119,7 +119,8 @@ export function useWindowedList<T extends HTMLElement>(options: WindowedListOpti
     };
     onChange();
   });
-  useEffect(updateRange, [count, revision, updateRange]);
+  // Before paint: a row appended at the bottom (a message just sent) mounts in the same frame it is added.
+  useLayoutEffect(updateRange, [count, revision, updateRange]);
 
   // One observer measures the mounted rows; after every render it follows rows mounting and unmounting.
   const measuring = useRef<{ observer: ResizeObserver; rows: Map<Element, number> } | null>(null);
