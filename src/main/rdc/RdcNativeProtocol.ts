@@ -140,6 +140,37 @@ export class RdcNativeFailure extends AppError {
   }
 }
 
+/**
+ * What the model may read beyond the native code and message. Only the owner-unavailable infrastructure failure exposes
+ * its bounded recovery fields; arbitrary native details (including state paths and credentials) stay internal. An input
+ * attachment the backend cannot inspect gets one fixed host note, because a retry returns the same result.
+ */
+function failureGuidance(
+  failure: { code: string; category?: unknown },
+  details: Record<string, unknown> | null,
+  inputAttachmentUnsupported: boolean,
+): string {
+  const ownerGuidance =
+    failure.code === 'daemon_owner_unavailable' && failure.category === 'runtime'
+      ? ['reason', 'recovery_hint'].flatMap((key) => {
+          const value = details?.[key];
+          return typeof value === 'string' &&
+            value.trim().length > 0 &&
+            value.length <= 512 &&
+            !/[\u0000-\u001f\u007f]/u.test(value)
+            ? [`${key}: ${value.trim()}`]
+            : [];
+        })
+      : [];
+  const hostGuidance = inputAttachmentUnsupported
+    ? [
+        'host: this backend cannot inspect the input attachment and a retry returns the same result; compare region values before and after the event, read the producing pass output, or read another texture',
+      ]
+    : [];
+  const guidance = [...ownerGuidance, ...hostGuidance];
+  return guidance.length ? ` (${guidance.join('; ')})` : '';
+}
+
 /** The failure is the operation's own worker, daemon or cancellation, whether or not its details parse. */
 export function isRdcProcessFailure(error: RdcNativeFailure): boolean {
   return isProcessFailureCode(error.nativeError.code);
@@ -217,7 +248,12 @@ export function parseRdcNativeResult(
       Number(details.restored_event_id) > 0
         ? { contextId: details.context_id, sessionId: details.session_id, eventId: Number(details.restored_event_id) }
         : null;
+    // Pixel history and shader debug (which replays through pixel history) cannot inspect an input attachment.
+    const inputAttachmentUnsupported =
+      ['rd.texture.get_pixel_history', 'rd.shader.debug_start'].includes(resultKind!) &&
+      details?.failure_stage === 'validate_input_attachment';
     const knownInspectionFailure =
+      inputAttachmentUnsupported ||
       (resultKind === 'rd.shader.get_source' &&
         details?.failure_stage === 'resolve_binding' &&
         ['stage_unbound', 'shader_id_not_bound'].includes(String(details.failure_reason))) ||
@@ -232,8 +268,6 @@ export function parseRdcNativeResult(
         'rd.texture.diff',
       ].includes(resultKind!) &&
         details?.failure_stage === 'decode_texture_readback') ||
-      (['rd.texture.get_pixel_history', 'rd.shader.debug_start'].includes(resultKind!) &&
-        details?.failure_stage === 'validate_input_attachment') ||
       (resultKind === 'rd.shader.edit_and_replace' &&
         failure.code === 'shader_patch_op_unsupported_for_encoding' &&
         details?.failure_stage === 'validate_edit_plan' &&
@@ -250,23 +284,9 @@ export function parseRdcNativeResult(
       Number(details.restored_event_id) > 0
         ? { contextId: details.context_id, sessionId: details.session_id, eventId: Number(details.restored_event_id) }
         : null;
-    // Only this infrastructure failure exposes its bounded recovery guidance.
-    // Arbitrary native details (including state paths and credentials) stay internal.
-    const ownerGuidance =
-      failure.code === 'daemon_owner_unavailable' && failure.category === 'runtime'
-        ? ['reason', 'recovery_hint'].flatMap((key) => {
-            const value = details?.[key];
-            return typeof value === 'string' &&
-              value.trim().length > 0 &&
-              value.length <= 512 &&
-              !/[\u0000-\u001f\u007f]/u.test(value)
-              ? [`${key}: ${value.trim()}`]
-              : [];
-          })
-        : [];
-    const guidance = ownerGuidance.length ? ` (${ownerGuidance.join('; ')})` : '';
+    const guidanceSuffix = failureGuidance(failure, details, inputAttachmentUnsupported);
     throw new RdcNativeFailure(
-      `RDC_CLI_FAILED: ${failure.code}: ${failure.message}${suffix}${guidance}`,
+      `RDC_CLI_FAILED: ${failure.code}: ${failure.message}${suffix}${guidanceSuffix}`,
       resultKind,
       effectsNotAttempted,
       {

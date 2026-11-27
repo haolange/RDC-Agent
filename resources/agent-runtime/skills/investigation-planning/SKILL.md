@@ -42,7 +42,7 @@ Debugger、Analyzer、Optimizer 三个 Mission 共用这份方法：把用户的
 
 - 本回合建了未完成的 Task：填 `requiredTaskIds`，确无必需 Task 填 `[]`。正文里写 Task 名称不会冻结要求。
 - 要用实时回放：填 `captureScope`（已登记的 `inputIds`、当前 `deviceId` 和调查目标，取自 `runtime_context.capturePlanning`）。临时切换事件并在结束时恢复入口位置属于导航，不需另批。
-- 要做可逆干预：在 `authorizations` 逐项写操作、目标、效果、可逆性和被授权的修改次数；用户批准的就是这份清单，没写的干预不做。
+- 要做可逆干预：在 `authorizations` 逐项写操作、目标、效果、可逆性和授权的修改次数；清单外的干预交宿主审核，判不了由用户批准。
 - 已批准的 Task 定义或用户限制需要变更：经 `plan_artifact.taskRevisions` 正常修订，不静默删除。
 
 额度权威在 Harness：请求上限见 `runtime:execution-limits`，Task root 与 Capsule 的工具数、子执行数和期限由主进程冻结执行，实际消费与余量读 `task_get.budgetSnapshot`／`requestUsage`。计划只引用这些真实限制和用户明确规定的限制，可以给可调整的估算，但不自编阶段配额，也不把估算写成停止条件。

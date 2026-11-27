@@ -5,11 +5,11 @@ description: Execute a frozen RenderDoc investigation plan, deliver in place, an
 
 # RenderDoc Execution
 
-General 执行已批准的调查计划时用这份方法：读冻结的计划和最新 Checkpoint，在计划边界内把调查做到证据允许的深度，就地交付。计划正文写策略，执行所需的引用在正文末尾的执行引用和主进程合同里。CLI 用法见 $rdc-tool-shell，专业操作与记录写法见本次预载的手册和领域方法。
+General 执行已批准的调查计划时用这份方法：读冻结的计划和最新 Checkpoint，在计划边界内把调查做到证据允许的深度，就地交付。执行所需的引用在计划末尾和主进程合同里。CLI 用法见 $rdc-tool-shell，专业操作与记录写法见本次预载的手册和领域方法。
 
 ## 调查主线
 
-每得到一个结果，都回到这条主线判断下一步。它是判断顺序，不是固定的工具序列；知识检索、对象定位和计算分析可以交错。
+每得到一个结果，都回到这条主线判断下一步。它是判断顺序，不是固定的工具序列。
 
 1. **锚定**。把用户目标落到当前 capture 的具体对象：哪张原生纹理、哪个区域、哪个事件或 draw、哪条资源链，以及"它就是用户所指"的依据。依据分三档，写在锚点 Evidence 的 summary 开头：`user-confirmed`、`cross-validated`（两条独立路径互相印证）、`candidate`。做法见 $pixel-forensics。锚点仍是候选时，下一步优先做能确立或否定它的检查。
 2. **解释与预测**。对已锚定的对象保留可以互相区分的解释，每条写明成立时应观察到什么、什么观察会削弱或排除它。来自 Knowledge 的解释另写适用条件里哪些已匹配、未知或不符；条件未知先核对，证伪了才排除。
@@ -20,8 +20,7 @@ General 执行已批准的调查计划时用这份方法：读冻结的计划和
 
 ## 续跑与循环
 
-- **Small Loop**：批准范围内的补证、区分与核验在当前执行里继续，沿用原消费与期限。
-- **Big Loop**：要换 capture 或设备、做计划外的操作或目标变了，保存 Checkpoint，在终答写清缺口与依据，由用户切回 Mission。
+- **Big Loop**：要换 capture 或设备、或目标变了，保存 Checkpoint，在终答写清缺口与依据，由用户切回 Mission。清单外但服务批准目标的可逆干预直接调用，由宿主审核，不降为建议。
 - 额度耗尽仍未完成时声明 `budget_paused` 并引用最后的 Checkpoint；先做能决定下一步的检查，为恢复和收口留出余量。
 - 上下文压缩后先读回冻结计划和最新 Checkpoint，再决定下一步。
 
@@ -29,6 +28,7 @@ General 执行已批准的调查计划时用这份方法：读冻结的计划和
 
 - **切换与恢复**：跨 capture 用计划批准的 inputId 经 `rdc_probe` 的 `capture_select` 切换。`runtime_context.captureRestoration` 是入口基线，不是当前事件，当前位置要实际查询。结束前调用 `capture_restore` 并检查 `restoration.restored`。
 - **故障**：现场被隔离时宿主自动重建（结果附 `runtimeRecovery`），没重建才用 `capture_recover`。中断实验不与新现场拼接，重取基线；要用户处理就 ask_user，同一故障再现就换检查。
+- **能力不支持**：unsupported 或输入附件限制（Pixel History、Shader Debug）不重试，改读事件前后区域值、生产者 pass 输出或别的纹理；都不行记 `blocker: capability`。
 - **取图**：临时路径读不到、当前事件没有普通颜色目标，都不等于图像取不到；用观察或导出能力（例如 `rd.session.observe` 的最终输出）写到有权限的位置再读取。坐标以原生纹理为准。
 - **实验**：干预要真实执行并恢复。experimentId 绑定 baseline → intervention → variant → rollback → restored 五份签名回执，记在 Experiment 的 `executionEvidence` 里（取法见 $rdc-tool-shell）。撤销前保存变体现场需要的图像、参数和替换枚举。干预有语义依据、范围受限、预测可区分并能恢复就可以做，不要求事先证明它全局最小。
 - 在计划边界内用 `task_create`／`task_update` 调整 Tasks；用户没有要求时不写持久 Memory／Knowledge。
@@ -48,7 +48,7 @@ General 执行已批准的调查计划时用这份方法：读冻结的计划和
 ## 材料
 
 - 用户给出的区域、参考图和对比条件可以作为锚点的"用户确认"依据，不是已验证的原因，也不是修改授权。对象或区域确有歧义、材料又判定不了时，问用户一次。
-- 参考图与 capture 的构图或曝光不一致时，跨图定量比较标为不可比；同一回放内的前后与目标区／控制区配对照常做。画质依实际读到的图像判断，看不清就读原生区域数值。
+- 参考图与 capture 的构图或曝光不一致时，跨图定量比较标为不可比；同一回放内的前后与目标区／控制区配对照常做。
 
 ## 交付
 

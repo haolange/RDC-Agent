@@ -125,7 +125,7 @@
       "complexity": 41
     },
     "src/main/rdc/RdcNativeProtocol.ts": {
-      "complexity": 80
+      "complexity": 77
     },
     "src/main/rdc/RdcOperationPolicy.ts": {
       "complexity": 41
