@@ -1,8 +1,8 @@
 .settings-model-cascade {
   width: 100%;
-  align-self: start;
 }
 
+/* The same field surface as the Select beside it: background, radius and hover/open border. */
 .settings-model-cascade-trigger {
   display: flex;
   width: 100%;
@@ -12,15 +12,16 @@
   padding: 0 var(--space-3);
   min-height: var(--control-height-md);
   border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--settings-subtle-bg);
+  border-radius: var(--control-radius);
+  background: var(--token-bg-panel);
   color: var(--token-text-primary);
   text-align: start;
   cursor: pointer;
 }
 
-.settings-model-cascade-trigger:hover {
-  border-color: var(--token-border-default);
+.settings-model-cascade-trigger:hover,
+.settings-model-cascade-trigger[aria-expanded='true'] {
+  border-color: var(--token-border-strong);
 }
 
 .settings-model-cascade-trigger:focus-visible {

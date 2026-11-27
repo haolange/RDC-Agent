@@ -51,19 +51,15 @@
 }
 
 @container settings-panel (max-width: 48rem) {
-  .settings-manifest-toolbar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .settings-manifest-layout,
   .settings-manifest-form-grid,
   .settings-page-agents .settings-manifest-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* The page grows with its content and scrolls with the panel, keeping the gap between its blocks. */
   .settings-page-agents .settings-manifest-page {
-    display: block;
+    height: auto;
     flex: 0 0 auto;
   }
 
