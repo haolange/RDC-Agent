@@ -1,11 +1,6 @@
 import { fileOperationBoundary } from '../runtime/FileOperationBoundary';
 import { assertRdcDiscovery, parseShellRdcInput } from './RdcShellInput';
-import {
-  assertRdcBindingOwnership,
-  authorizeRdcOperation,
-  rdcCatalogCapabilitySummary,
-  rdcOperationCapability,
-} from './RdcOperationPolicy';
+import { assertRdcBindingOwnership, authorizeRdcOperation } from './RdcOperationPolicy';
 import { readRdcHostControls } from './RdcHostControls';
 import type {
   AgentPermissionDecision,
@@ -26,6 +21,16 @@ function request(
 
 function denied(reason: string): AgentPermissionDecision {
   return { action: 'deny', reason, risk: 'high', temporaryPathRoots: [] };
+}
+
+/** Whether any path argument of the operation names a protected file; such input needs specific authorization. */
+export function hasProtectedPathInput(definition: RdcOperationDefinition, args: Record<string, unknown>): boolean {
+  return definition.path_inputs.some((entry) => {
+    const values = args[entry.name];
+    return (Array.isArray(values) ? values : [values]).some(
+      (value) => typeof value === 'string' && fileOperationBoundary(value).protected,
+    );
+  });
 }
 
 export function evaluateRdcShellBaseline(
@@ -71,12 +76,7 @@ export function evaluateRdcShellBaseline(
     );
     const effects = admitted.definition.effects;
     const changesShader = effects.includes('shader_replacement');
-    const protectedPaths = admitted.definition.path_inputs.some((entry) => {
-      const values = admitted.args[entry.name];
-      return (Array.isArray(values) ? values : [values]).some(
-        (value) => typeof value === 'string' && fileOperationBoundary(value).protected,
-      );
-    });
+    const protectedPaths = hasProtectedPathInput(admitted.definition, admitted.args);
     const decision =
       mode === 'full-access'
         ? { action: 'allow' as const, risk: 'low' as const, temporaryPathRoots: [] }
@@ -89,7 +89,6 @@ export function evaluateRdcShellBaseline(
                 : 'Validated operation within the owning replay and workspace.',
             protectedPaths ? 'high' : changesShader ? 'medium' : 'low',
           );
-    const definitions = input.executionContext.rdcBinding!.definitions as readonly RdcOperationDefinition[];
     return {
       ...decision,
       operationFacts: {
@@ -106,10 +105,6 @@ export function evaluateRdcShellBaseline(
         arguments: admitted.args,
         experimentId: rdcRequest.experimentId ?? null,
         catalogFingerprint: input.executionContext.rdcBinding!.definitionsFingerprint,
-        catalogCapabilities: changesShader ? rdcCatalogCapabilitySummary(definitions) : undefined,
-        rollbackContracts: changesShader
-          ? definitions.filter((item) => item.evidence_kind === 'rollback' && rdcOperationCapability(item).available)
-          : undefined,
         hostControls:
           changesShader || protectedPaths
             ? readRdcHostControls(

@@ -251,6 +251,7 @@ describe('final tool permission admission', () => {
           signal,
           onEvent: (event) => events.push(event),
           action: { tool: 'shell', arguments: {}, reason: 'test', facts: {} },
+          route: { route: 'model', facts: [] },
           reviewer: async () => {
             reviewerStarted.resolve();
             return review.promise;

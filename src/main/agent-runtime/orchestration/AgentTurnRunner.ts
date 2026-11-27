@@ -9,12 +9,6 @@ import { isErrorCode } from '@shared/errors/errorCodes';
 
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { generateEventId, nowMs } from '@shared/utils/id';
-import {
-  permissionReviewAuthority,
-  permissionReviewCaptureBaseline,
-  permissionReviewEvidence,
-} from '../permissions/PermissionReviewAuthority';
-import { executePermissionReview } from '../permissions/PermissionReviewRuntime';
 import { delegatedArtifactReferences } from '../../sessions/artifacts/DelegatedArtifactAccess';
 import { providerFirstByteTimeoutMs } from '../providers/internal/streamWatchdog';
 import { TokenizerService } from '../core/TokenizerService';
@@ -45,6 +39,7 @@ import {
   installCompletionReadinessValidator,
 } from './AgentTurnCompletionGuards';
 import { subscribeAgentTurnEvents, type AgentTurnOutput } from './AgentTurnSubscription';
+import { createTurnPermissionReview } from './TurnPermissionReview';
 import { persistToolCallingRejection, reportRouteDiagnostics } from './AgentTurnCapabilityObservations';
 import type { AgentEventBridgeContext } from '../AgentEventBridge';
 import type {
@@ -424,8 +419,8 @@ export class AgentTurnRunner {
     sharedEventContext: AgentEventBridgeContext,
     activeToolDefinitions: ToolDefinition[],
   ): ToolExecutor {
-    const { input, preparedRuntime, requestPlan, turnHandle, executionScopeId, mcpLease } = run;
-    const { promptPlan, routeCapability, effectivePlan } = preparedRuntime;
+    const { input, preparedRuntime, turnHandle, executionScopeId, mcpLease } = run;
+    const { routeCapability, effectivePlan } = preparedRuntime;
     const activeToolAllowlist = activeToolDefinitions.map((tool) => tool.name);
     // native-structured：执行器用 plan 冻结 allowlist；其它路由与注入列表一致。
     const executorAllowlist =
@@ -441,39 +436,7 @@ export class AgentTurnRunner {
       mcpPoolKey: mcpLease?.poolKey ?? null,
       effectivePlan,
       policyBudget: turnHandle.policyBudget,
-      reviewPermission: (action, signal, tool) =>
-        executePermissionReview({
-          sessionId: executionScopeId,
-          plan: requestPlan,
-          credentialHandle: preparedRuntime.credentialHandle,
-          reasoning: routeCapability.reasoningContract,
-          evidence: {
-            ...permissionReviewEvidence(run.slot?.agent.messages ?? [], executionScopeId, action.arguments),
-            ...(tool?.spec.capture?.replayLifecycle?.(action.arguments) === 'capture_restore'
-              ? {
-                  captureBaseline: permissionReviewCaptureBaseline({
-                    controller: turnHandle.captureControl,
-                    sessionId: executionScopeId,
-                    projectId: input.projectId,
-                    turnId: turnHandle.turnId,
-                    agentId: input.agentId,
-                    accessCeiling: effectivePlan.accessCeiling,
-                  }),
-                }
-              : {}),
-          },
-          authority: permissionReviewAuthority({
-            sessionId: executionScopeId,
-            messages: input.initialMessages ?? [],
-            currentRequest: input.content,
-            promptPlan,
-            workspace: effectivePlan.projectRootPath,
-            agentId: input.agentId,
-            delegated: !!effectivePlan.delegationCapsule,
-          }),
-          action,
-          signal,
-        }),
+      ...createTurnPermissionReview(run),
     });
   }
 

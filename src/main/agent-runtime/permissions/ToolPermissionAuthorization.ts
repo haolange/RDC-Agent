@@ -11,6 +11,7 @@ import {
   type AutoReviewOutcome,
   type ToolApprovalRequestInput,
 } from './AgentToolApprovalRequestService';
+import { decideAdmission, type TurnAdmission } from './PermissionAdmission';
 import type { RuntimePermissionState } from '@shared/types/runtimePermission';
 import type { PermissionReviewer } from './PermissionReviewRuntime';
 
@@ -54,7 +55,8 @@ function autoReviewDenial(risk: AgentPermissionDecision['risk'], outcome: AutoRe
 export interface ToolPermissionAuthorizationInput {
   decision: Omit<AgentPermissionDecisionInput, 'permissionState'>;
   approval?: Omit<ToolApprovalRequestInput, 'reason' | 'risk' | 'signal' | 'argumentsSha256'>;
-  reviewer?: PermissionReviewer;
+  /** This turn's admission (host facts first) and the review model for what they leave open. */
+  review?: { admission?: TurnAdmission; reviewPermission?: PermissionReviewer };
   executionBudget?: object;
   assertLive: () => void;
 }
@@ -100,24 +102,40 @@ export async function authorizeToolPermission(
   }
   if (decision.action === 'auto_review') {
     if (!input.approval) throw new ToolPermissionDenied('Auto-review requires an active conversation turn.');
+    const reason = decision.reason ?? 'Review required';
+    const admission = input.review?.admission;
+    const { route, settle } = admission
+      ? admission.assess(
+          {
+            decision,
+            toolCall,
+            tool: input.decision.tool,
+            executionContext: input.decision.executionContext,
+          },
+          argumentsSha256,
+        )
+      : { route: decideAdmission(null, decision.risk, reason), settle: undefined };
     const verdict = await agentToolApprovalRequestService.autoReview({
       ...input.approval,
       argumentsSha256,
+      route,
       action: {
         tool: input.decision.toolCall.name,
         arguments: structuredClone(input.decision.toolCall.arguments),
-        reason: decision.reason ?? 'Review required',
+        reason,
         facts: {
           ...decision.operationFacts,
+          ...(route.route === 'model' && route.facts.length ? { hostChecks: route.facts } : {}),
           executionBudget: input.executionBudget ? { ...input.executionBudget, observedAt: Date.now() } : null,
         },
       },
-      reviewer: input.reviewer,
+      reviewer: input.review?.reviewPermission,
       tool: input.decision.tool,
       reason: decision.reason ?? 'Tool requires review.',
       risk: decision.risk,
       signal,
     });
+    if (!verdict.errorCode) settle?.(verdict);
     if (verdict.verdict !== 'allow') throw autoReviewDenial(decision.risk, verdict);
   }
   input.assertLive();

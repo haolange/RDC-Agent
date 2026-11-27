@@ -359,7 +359,7 @@ export class ToolExecutorFactory {
                       onEvent: runtimeContext.onEvent,
                     }
                   : undefined,
-              reviewer: runtimeContext?.reviewPermission,
+              review: runtimeContext,
               executionBudget: policyBudget,
               assertLive,
             },

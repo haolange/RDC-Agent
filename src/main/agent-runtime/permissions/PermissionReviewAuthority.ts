@@ -13,6 +13,7 @@ import type { AgentMessage, AssistantMessage, Message, ToolResultMessage } from 
 import type { PromptPlan } from '@shared/types/rdcRuntime';
 import type { AgentAccessCeiling } from '@shared/types/agentManifest';
 import type { ApprovedCaptureController } from '../orchestration/ApprovedCaptureController';
+import type { InvestigationContentRef } from '@shared/types/renderdocInvestigation';
 
 function boundedObservation(value: unknown, maxChars: number): unknown {
   const safe = redactSecretsDeep(value).value;
@@ -35,18 +36,22 @@ function observedText(message: ToolResultMessage): unknown[] {
     });
 }
 
-/** Give the reviewer the owning turn's verified entry position, not an approval. */
-export function permissionReviewCaptureBaseline(input: {
+/**
+ * The owning turn's signed entry position, as an admission fact. A record that does not match its owner throws; an
+ * entry position that was never verified is reported unavailable with its reason.
+ */
+export function verifiedCaptureBaseline(input: {
   controller: ApprovedCaptureController | null;
   sessionId: string;
   projectId: string | null | undefined;
   turnId: string;
   agentId: string;
   accessCeiling: AgentAccessCeiling;
-}) {
-  if (!input.controller || !input.projectId) return undefined;
+}): { available: true; ref: InvestigationContentRef; original: unknown } | { available: false; reason: string } {
+  if (!input.controller || !input.projectId) return { available: false, reason: 'RDC_INITIAL_STATE_UNVERIFIED' };
   const baseline = input.controller.restorationBaselineFor({ ...input, projectId: input.projectId });
-  if (!baseline?.available) return undefined;
+  if (!baseline) return { available: false, reason: 'RDC_EXECUTION_DENIED' };
+  if (!baseline.available) return { available: false, reason: baseline.reason };
   const receipt = rdcLifecycleReceipts.read(input.sessionId, baseline.receipt);
   if (
     receipt.event !== 'baseline' ||
@@ -56,7 +61,7 @@ export function permissionReviewCaptureBaseline(input: {
   ) {
     throw new AppError('PERMISSION_REVIEW_EVIDENCE_INVALID', 'capture baseline does not match the owning execution.');
   }
-  return { ref: baseline.receipt, original: receipt.original, verifiedBy: 'main-lifecycle-signature-and-owner-check' };
+  return { available: true, ref: baseline.receipt, original: receipt.original };
 }
 
 /** Observations from the actual slot, never assistant claims or inherited parent history. */

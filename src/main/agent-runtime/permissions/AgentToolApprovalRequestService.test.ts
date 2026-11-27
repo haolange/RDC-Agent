@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { PermissionModeChangedError } from '../../runtime/RuntimePermissionStateService';
 import { auditLog } from '../../runtime/AuditLog';
+import { decideAdmission } from './PermissionAdmission';
 import { AgentToolApprovalRequestService } from './AgentToolApprovalRequestService';
 import { PermissionReviewError, type PermissionReviewVerdict } from './PermissionReviewRuntime';
 const base = {
@@ -14,11 +15,18 @@ const base = {
   reason: 'Owned replay change',
   context: { sessionId: 'session', turnId: 'turn', agentId: 'general' },
   action: { tool: 'shell', arguments: { rdc: {} }, reason: 'Owned replay change' },
+  route: { route: 'model', facts: [] },
 } as const;
 it('approves rule-safe actions without requesting a model verdict', async () => {
   const reviewer = vi.fn();
   const onEvent = vi.fn();
-  const result = await new AgentToolApprovalRequestService().autoReview({ ...base, risk: 'low', reviewer, onEvent });
+  const result = await new AgentToolApprovalRequestService().autoReview({
+    ...base,
+    risk: 'low',
+    route: decideAdmission(null, 'low', base.reason),
+    reviewer,
+    onEvent,
+  });
   expect(result).toMatchObject({
     verdict: 'allow',
     failedChecks: [],

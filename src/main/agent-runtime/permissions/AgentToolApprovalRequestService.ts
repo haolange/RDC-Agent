@@ -9,6 +9,7 @@ import { auditLog, AuditWriteFailedError } from '../../runtime/AuditLog';
 import { PermissionModeChangedError } from '../../runtime/RuntimePermissionStateService';
 import { PermissionReviewError } from './PermissionReviewRuntime';
 import type { PermissionReviewer, PermissionReviewAction, PermissionReviewVerdict } from './PermissionReviewRuntime';
+import type { AdmissionRoute } from './PermissionAdmission';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentApprovalEventPayload, AgentEvent } from '@shared/types/agentRuntime';
 import type { AgentTool } from '../agent/AgentTool';
@@ -109,12 +110,14 @@ export class AgentToolApprovalRequestService {
 
   async autoReview(
     input: ToolApprovalRequestInput & {
+      /** The admission decision: settled by host rule, or left to the model with the host facts attached. */
+      route: AdmissionRoute;
       action?: PermissionReviewAction;
       reviewer?: PermissionReviewer;
       tool?: Pick<AgentTool, 'spec'>;
     },
   ): Promise<AutoReviewOutcome> {
-    const reviewMethod = input.risk === 'low' ? ('rule' as const) : ('model' as const);
+    const reviewMethod = input.route.route;
     let errorCode: string | undefined;
     const approvalId = `auto-review-${input.toolCallId}-${randomUUID()}`;
     const synthetic: PendingToolApprovalRequest = {
@@ -143,8 +146,8 @@ export class AgentToolApprovalRequestService {
     let reviewCancelled = false;
     try {
       input.signal?.throwIfAborted();
-      if (input.risk === 'low') {
-        verdict = { verdict: 'allow', failedChecks: [], reason: `RULE_APPROVED: ${input.reason}` };
+      if (input.route.route === 'rule') {
+        verdict = input.route.verdict;
       } else {
         if (!input.reviewer || !input.action)
           throw new PermissionReviewError('PERMISSION_REVIEW_UNAVAILABLE', 'no frozen reviewer is available.');

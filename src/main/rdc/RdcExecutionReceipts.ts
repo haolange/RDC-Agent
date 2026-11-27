@@ -1,7 +1,11 @@
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { z, type ZodType } from 'zod';
 import { AppError } from '@shared/errors/appError';
-import { sessionArtifactResolver, type SessionArtifactResolver } from '../sessions/artifacts/SessionArtifactResolver';
+import {
+  sessionArtifactResolver,
+  type SessionArtifactReadResult,
+  type SessionArtifactResolver,
+} from '../sessions/artifacts/SessionArtifactResolver';
 import { secretStorageService } from '../settings/settings-core/SecretStorageService';
 import { rdcDigest } from './RdcOperationCatalog';
 import { RdcProcessIdentitySchema } from './RdcProcessIdentity';
@@ -20,8 +24,7 @@ export interface RdcExecutionReceipt {
   replaySessionId: string;
   operation: string;
   definitionsFingerprint: string;
-  /** Historical receipts remain readable; every new experiment closure requires this proof. */
-  processIdentity?: RdcProcessIdentity;
+  processIdentity: RdcProcessIdentity;
   evidence: RdcValidatedEvidence;
   argsFingerprint: string;
   args: Record<string, unknown>;
@@ -44,7 +47,7 @@ const RdcExecutionReceiptSchema: ZodType<RdcExecutionReceipt> = z
     replaySessionId: z.string(),
     operation: z.string(),
     definitionsFingerprint: sha256Hex,
-    processIdentity: RdcProcessIdentitySchema.optional(),
+    processIdentity: RdcProcessIdentitySchema,
     evidence: z.union([
       z.object({
         kind: z.literal('measurement'),
@@ -86,6 +89,8 @@ function parseReceiptJson(text: string, code: ReceiptInvalidCode): unknown {
 }
 
 const KEY_REF = 'rdc-execution-receipt-signing';
+const RECEIPT_URI_PREFIX = 'session://tool-outputs/rdc-receipt-';
+const normalizeHash = (ref: InvestigationContentRef): string => ref.expectedHash.replace(/^sha256:/, '');
 
 /** Main-owned key is never part of a tool result, IPC, prompt, or session artifact. */
 function signingKey(): string {
@@ -112,14 +117,26 @@ export class RdcExecutionReceipts {
     const signature = createHmac('sha256', this.key()).update(body).digest('hex');
     const written = this.resolver.write(
       receipt.sessionId,
-      'session://tool-outputs/rdc-receipt-' + randomUUID() + '.json',
+      RECEIPT_URI_PREFIX + randomUUID() + '.json',
       JSON.stringify({ body, signature }),
       { mimeType: 'application/json', signal },
     );
     return { uri: written.uri, expectedHash: 'sha256:' + written.hash };
   }
   read(sessionId: string, ref: InvestigationContentRef): RdcExecutionReceipt {
-    const read = this.resolver.read(sessionId, ref.uri, { expectedHash: ref.expectedHash.replace(/^sha256:/, '') });
+    return this.verify(sessionId, this.resolver.read(sessionId, ref.uri, { expectedHash: normalizeHash(ref) }));
+  }
+  /**
+   * Every receipt this session holds, each verified by its signature, ownership and digests. The signature is the
+   * integrity proof, so no caller-supplied hash is involved; one unverifiable receipt fails the whole listing.
+   */
+  list(sessionId: string): RdcExecutionReceipt[] {
+    return this.resolver
+      .list(sessionId, 'tool-outputs')
+      .filter((uri) => uri.startsWith(RECEIPT_URI_PREFIX))
+      .map((uri) => this.verify(sessionId, this.resolver.read(sessionId, uri)));
+  }
+  private verify(sessionId: string, read: SessionArtifactReadResult): RdcExecutionReceipt {
     if (read.category !== 'tool-outputs' || read.truncated || !read.text)
       throw new AppError('RDC_RECEIPT_INVALID', 'incomplete receipt');
     const parsed = RdcExecutionReceiptSchema.safeParse(

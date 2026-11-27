@@ -21,9 +21,11 @@ import { harvestOwnedRdcDaemons } from './rdc/OwnedRdcDaemonRegistry';
 import { settingsService } from './settings/settings-core/SettingsService';
 import { SettingsFileError } from './settings/settings-core/settingsFileSchema';
 import { evaluateRdcShellBaseline } from './rdc/rdcShellPermission';
+import { createRdcAdmissionAdapter } from './rdc/rdcAdmission';
 import { acquireRdcPreparationLock, setRdcInteractionLock } from './rdc/RdcOperationCoordinator';
 import { registerConversationRdcHost } from './conversation/conversationRdcHost';
 import { registerRdcShellBaseline } from './agent-runtime/permissions/AgentPermissionPolicy';
+import { registerAdmissionAdapter } from './agent-runtime/permissions/PermissionAdmission';
 import { bindTraceProjectionSource } from './agent-runtime/orchestration/TraceProjectionRefreshService';
 import { requestSnapshotStore } from './agent-runtime/prompt/RequestSnapshotStore';
 import { removeSessionTasks } from './agent-runtime/tasks/sessionTaskStore';
@@ -64,6 +66,7 @@ import type { ShutdownCause } from '@shared/types/lifecycle';
  */
 function bindCrossDomainHosts(): void {
   registerRdcShellBaseline(evaluateRdcShellBaseline);
+  registerAdmissionAdapter(createRdcAdmissionAdapter());
   registerConversationRdcHost({
     acquirePreparationLock: acquireRdcPreparationLock,
     setInteractionLock: setRdcInteractionLock,
