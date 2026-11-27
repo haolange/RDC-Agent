@@ -552,6 +552,7 @@ const ERROR_REGISTRY = {
   RDC_RECEIPT_KEY_UNAVAILABLE: availability(),
   RDC_RECOVERY_BLOCKED: availability(),
   RDC_RECOVERY_BUDGET_EXHAUSTED: availability(),
+  RDC_RECOVERY_REPEATED_FAULT: availability(),
   RDC_RECOVERY_DEVICE_UNAVAILABLE: availability(),
   RDC_REMOTE_UPGRADE_REQUIRED: availability(),
   RDC_REPLAY_BUSY: availability(),

@@ -28,7 +28,7 @@ import { extractDeferredToolNamesFromToolSearchDetails } from './deferredTools';
 import { flushPolicyBudgetObservers } from './DelegationBudget';
 import { executePlanArtifact, type PlanArtifactToolCall } from './PlanArtifactSubmission';
 import { toolResourceArbiter, toolResourceKey } from './ToolResourceArbiter';
-import { settleRdcProcessFault } from './RdcProcessFaultRecovery';
+import { recoverQuarantinedCapture } from './RuntimeCaptureRecovery';
 import {
   admitToolCall,
   captureAccessDenial,
@@ -40,6 +40,7 @@ import {
   type ToolExecutorScope,
   type ValidatedToolCall,
 } from './ToolCallAdmission';
+import type { ApprovedCaptureController } from './ApprovedCaptureController';
 import type { RuntimeToolResolver, ToolExecutorRuntimeContext } from './orchestratorTypes';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import type { ToolCallContent, ToolResultMessage } from '../core/types';
@@ -110,7 +111,6 @@ export class ToolExecutorFactory {
     return {
       shouldEndTurnAfterToolResult: (result) => {
         const turn = this.deps.activeTurns.getActiveTurn(sessionId);
-        if (turn?.rdcRecoveryBlocker?.toolCallId === result.toolCallId) return true;
         // The result names the tool exactly as called; only the canonical name resolves.
         return (
           !result.isError &&
@@ -192,10 +192,8 @@ export class ToolExecutorFactory {
     const validated = validateToolArguments(tool, toolCall);
     if (!validated.ok) return validated.result;
     const call: ValidatedToolCall = { toolCall, tool, args: validated.value };
-    const captureDenial = captureAccessDenial(
-      call,
-      this.deps.activeTurns.getActiveTurn(runtimeContext?.sessionId ?? sessionId),
-    );
+    const activeTurn = this.deps.activeTurns.getActiveTurn(runtimeContext?.sessionId ?? sessionId);
+    const captureDenial = captureAccessDenial(call, activeTurn);
     if (captureDenial) return denyTool(captureDenial);
     if (tool.spec.interaction === 'user-input') {
       return this.executeAskUserTool(
@@ -215,7 +213,35 @@ export class ToolExecutorFactory {
         onExecutionStart,
       });
     }
-    return this.executeToolEffect(scope, call, denyTool, signal, onUpdate, onExecutionStart);
+    const control = activeTurn?.captureControl;
+    const replayHealthy = control?.quarantined() === false;
+    const message = await this.executeToolEffect(scope, call, denyTool, signal, onUpdate, onExecutionStart);
+    return control && replayHealthy && control.quarantined()
+      ? this.withRuntimeRecovery(scope, message, control, signal)
+      : message;
+  }
+
+  /** The host recovers the replay this call left quarantined; the outcome rides on the call's own result. */
+  private async withRuntimeRecovery(
+    scope: ToolExecutorScope,
+    message: ToolResultMessage,
+    control: ApprovedCaptureController,
+    signal?: AbortSignal,
+  ): Promise<ToolResultMessage> {
+    const sessionId = scope.runtimeContext?.sessionId ?? scope.sessionId;
+    const projectRootPath = scope.runtimeContext?.projectRootPath ?? scope.plan?.projectRootPath ?? null;
+    const resourceKey = toolResourceKey(projectRootPath, rootScopeId(sessionId ?? 'ephemeral'));
+    const runtimeRecovery = await recoverQuarantinedCapture({
+      control,
+      permissionRevision: runtimePermissionStateService.getSnapshot().revision,
+      runExclusive: (operation) => toolResourceArbiter.runExclusive(resourceKey, signal, operation),
+      signal,
+    });
+    return {
+      ...message,
+      content: [...message.content, { type: 'text', text: JSON.stringify({ runtimeRecovery }) }],
+      details: { ...(message.details as Record<string, unknown> | undefined), runtimeRecovery },
+    };
   }
 
   private buildExecutionContext(
@@ -416,52 +442,24 @@ export class ToolExecutorFactory {
         error: error instanceof Error ? error.message : String(error),
       });
       if (tool.spec.presentation?.deliversNativeFailure && error instanceof RdcNativeFailure && error.deliveryResult)
-        return this.deliverNativeFailure(scope, toolCall, toolContext, error, error.deliveryResult, signal);
+        return this.deliverNativeFailure(scope, toolCall, error.deliveryResult);
       return errorToolResult(toolCall, error instanceof Error ? error.message : String(error));
     }
   }
 
-  /**
-   * A native failure reaches the model as pinned evidence. A stuck or lost worker on an approved capture first gets
-   * the post-call recovery step, whose outcome rides on the same result; a blocker ends an autonomous turn.
-   */
-  private async deliverNativeFailure(
+  /** A native failure reaches the model as pinned evidence, kept even below the offload threshold. */
+  private deliverNativeFailure(
     scope: ToolExecutorScope,
     toolCall: ToolCallContent,
-    toolContext: ToolExecutionContext,
-    error: RdcNativeFailure,
     delivered: AgentToolResult,
-    signal?: AbortSignal,
-  ): Promise<ToolResultMessage> {
-    const sessionId = scope.runtimeContext?.sessionId ?? scope.sessionId;
-    const projectRootPath = scope.runtimeContext?.projectRootPath ?? scope.plan?.projectRootPath ?? null;
-    const resourceKey = toolResourceKey(projectRootPath, rootScopeId(sessionId ?? 'ephemeral'));
-    const runtimeRecovery = await settleRdcProcessFault({
-      error,
-      control: toolContext.captureControl,
-      permission: runtimePermissionStateService.getSnapshot(),
-      runExclusive: (operation) => toolResourceArbiter.runExclusive(resourceKey, signal, operation),
-      signal,
-    });
-    let result = delivered;
-    if (runtimeRecovery) {
-      const details = { ...(result.details as Record<string, unknown>), runtimeRecovery };
-      result = { ...result, content: [{ type: 'text', text: JSON.stringify(details) }], details };
-      const turn = this.deps.activeTurns.getActiveTurn(toolContext.sessionId);
-      if (turn && runtimeRecovery.status === 'blocked' && runtimeRecovery.stopsTurn)
-        turn.rdcRecoveryBlocker = {
-          toolCallId: toolCall.id,
-          code: runtimeRecovery.code,
-          reason: runtimeRecovery.reason,
-        };
-    }
+  ): ToolResultMessage {
     return this.agentToolResultToMessage(
       toolCall,
       artifactizeToolResult({
-        sessionId,
+        sessionId: scope.runtimeContext?.sessionId ?? scope.sessionId,
         toolCallId: toolCall.id,
         toolName: toolCall.name,
-        result,
+        result: delivered,
         pinBelowThreshold: true,
       }),
     );

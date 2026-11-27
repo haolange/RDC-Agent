@@ -69,7 +69,7 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 |---|---|
 | `shellCommand` | 该参数的命令文本先过灾难硬拒绝与文件工具绕行检查（任何模式都先于权限求值），再按自定义拒绝/允许前缀、风险分析、工作区外路径与例行命令集分级；内置只有 `shell` 声明 |
 | `capture.nativeOperation` | 原生 RDC 操作（`shell.rdc`）交给注册的 RDC 操作策略判定，再取 policy 审批下限 |
-| `capture.replayLifecycle` | 改变 owning 回放的步骤（`rdc_probe` 的 `capture_select` / `capture_restore` / `capture_recover`）要求 `full` 天花板，按模式审批；自动审查时由准入事实判定，已批准计划的 `captureScope` 即其授权，`capture_restore` 另核验 owning 回合已签名的入口位置基线 |
+| `capture.replayLifecycle` | 改变 owning 回放的步骤（`rdc_probe` 的 `capture_select` / `capture_restore` / `capture_recover`）要求 `full` 天花板，按模式审批；自动审查时由准入事实判定，已批准计划的 `captureScope` 即其授权，回放此刻能否改变读获批 capture 控制器的 `readiness()` |
 | `knowledgeRoots: 'read-access'` | 冻结的 Knowledge 读根并入本次调用的免审批读根 |
 
 自动审查先按被审工具的 spec 交给领域适配器计算准入事实；送审时把待审动作（工具名、参数、原因、操作事实与准入事实）原样发给审核模型，spec 本身不发送。工具访问分类（`src/shared/constants/toolAccess.ts`）与 policy 的工具名单仍按名称，它们是按名称声明的配置而非工具行为。
@@ -208,9 +208,9 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 
 1. 本回合同一动作（工具名与参数 sha256）此前被拒且事实未变，或曾被人工拒绝：按规则拒绝，不再送审。
 2. 没有领域适配器认得的动作：已验证的低风险动作按规则批准，其余送模型。
-3. 任一事实不成立：按规则拒绝，并指名不成立的检查项。
+3. 任一事实不成立：按规则拒绝，并指名不成立的检查项。宿主核实不了的事实也算不成立，因为只看文本的模型同样核实不了宿主状态，所以这类事实从不送模型。
 4. 授权覆盖且全部事实成立：按规则批准。
-5. 其余（授权未覆盖，或某项事实在结构上不可得）送模型，事实随动作一起提交。
+5. 授权未覆盖的动作送模型判断语义余量，事实随动作一起提交。
 
 检查项是封闭枚举（`src/shared/constants/admissionChecks.ts`），每项带补救方：`agent` 是 Agent 能补上的事实，`host-or-user` 是宿主或用户的前置条件。拒绝以结构化工具结果返回：`AUTO_REVIEW_DENIED`、每个检查项及其补救方、出口（人工批准或调整权限模式）。
 
@@ -228,8 +228,16 @@ canonical knowledge 读根：`EffectiveRuntimePlan` 在 `prepareTurn` 冻结 `kn
 
 **领域适配器**由 RDC 模块在启动时注册（`src/main/rdc/rdcAdmission.ts`），领域词汇只出现在适配器里：
 
-- 回放生命周期：已批准计划的 `captureScope` 就是授权。`capture_select` 的输入须在范围内；`capture_restore` 须有 owning 回合已签名、归属匹配的入口位置基线；只有获批 General 的 owning 回合在 `full` 天花板下才能改变回放。实际恢复准入仍由执行时的 `classifyRecovery` 判定。没有获批计划时交给模型。
-- 可逆干预（如 shader 替换）：本回合独占 owning 回放；同一 experimentId 在当前回放上有已签名的基线测量；操作合同声明源 hash 参数时，修改须绑定所替换源的 hash；冻结目录有可用回滚覆盖该效果。授权项覆盖时另查目标一致、效果不超出授权、批准之后已签名的干预回执数低于上限，以及 `rollback-before-next` 下上一次修改已撤回。
+- 回放生命周期：
+  - 已批准计划的 `captureScope` 就是授权；`capture_select` 的输入还须在范围内。
+  - 回放此刻能否改变，读获批 capture 控制器的 `readiness()`，与执行层和 Capture 面板读的是同一个答案：lease 被隔离时只放行 `capture_recover`，其余一律按规则拒绝。
+  - 只有获批 General 的 owning 回合在 `full` 天花板下才能改变回放。
+  - 回到签名原位的 `capture_restore` 风险为 low。实际恢复准入仍由执行时的 `classifyRecovery` 判定。
+  - 没有获批计划或 capture 控制器时按规则拒绝。
+- 可逆干预（如 shader 替换）：
+  - 本回合独占 owning 回放；同一 experimentId 在当前回放上有已签名的基线测量；操作合同声明源 hash 参数时，修改须绑定所替换源的 hash；冻结目录有可用回滚覆盖该效果。
+  - 授权项覆盖时，另查效果不超出授权、批准之后已签名的干预回执数低于上限，以及 `rollback-before-next` 下上一次修改已撤回。
+  - 没有授权项、或授权项针对另一个目标的同一操作，记为授权未覆盖并送模型判断：计划不可能事先知道调查会落到哪一个 draw。
 - 带受保护路径输入的原生操作不由适配器判定，按原审核路径处理。
 
 **计划授权清单**：`plan_artifact.authorizations` 逐项声明冻结目录中的 intervention 操作、目标（`eventId`／`stage`／`shaderId`，各须等于动作参数）、效果类别、可逆性要求（`rollback-available` 或 `rollback-before-next`）和授权次数上限（1–16；是被授权的效果实例数，不是阶段配额）。

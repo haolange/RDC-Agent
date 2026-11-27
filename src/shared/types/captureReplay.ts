@@ -1,3 +1,4 @@
+import type { ErrorCode } from '../errors/errorCodes';
 import type { SessionScope, OpenedCapturePreview } from './session';
 import type { ReplayDeviceIssue, SessionDevicePreparation } from './device';
 export type CaptureReplayPhase =
@@ -82,6 +83,12 @@ export interface CaptureReplaySelection {
   captureSha256?: string;
   deviceId?: string;
 }
+
+/** Who can make an unusable replay usable again: the agent's recovery, the user, or a restart of the app. */
+export type CaptureExit = 'agent-recover' | 'ask-user' | 'restart';
+
+/** Whether live capture work may run now; every surface that asks reads this one answer. */
+export type CaptureReadiness = { state: 'ready' } | { state: 'blocked'; code: ErrorCode; exit: CaptureExit };
 
 export interface CaptureRecoveryStatus {
   pendingCount: number;

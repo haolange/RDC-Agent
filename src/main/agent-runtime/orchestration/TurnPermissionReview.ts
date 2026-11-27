@@ -1,15 +1,11 @@
-import {
-  permissionReviewAuthority,
-  verifiedCaptureBaseline,
-  permissionReviewEvidence,
-} from '../permissions/PermissionReviewAuthority';
+import { permissionReviewAuthority, permissionReviewEvidence } from '../permissions/PermissionReviewAuthority';
 import { executePermissionReview, type PermissionReviewer } from '../permissions/PermissionReviewRuntime';
 import { TurnAdmission } from '../permissions/PermissionAdmission';
 import { withPermissionReviewRoute } from '../permissions/PermissionReviewRoute';
 import type { AgentTurnRun } from './AgentTurnRunner';
 
 /**
- * This turn's admission and review model. Admission reads the approved plan and verified entry position of the turn;
+ * This turn's admission and review model. Admission reads the approved plan and the capture readiness of the turn;
  * the reviewer sees only what admission leaves open, with the turn's authority and its own slot's observations.
  */
 export function createTurnPermissionReview(run: AgentTurnRun): {
@@ -27,15 +23,7 @@ export function createTurnPermissionReview(run: AgentTurnRun): {
     approved: approvedExecution
       ? { approvedAt: approvedExecution.offer.approvedAt, contract: approvedExecution.investigation }
       : null,
-    captureBaseline: () =>
-      verifiedCaptureBaseline({
-        controller: turnHandle.captureControl,
-        sessionId: executionScopeId,
-        projectId: input.projectId,
-        turnId: turnHandle.turnId,
-        agentId: input.agentId,
-        accessCeiling: effectivePlan.accessCeiling,
-      }),
+    captureReadiness: () => turnHandle.captureControl?.readiness() ?? null,
   });
   const reviewPermission: PermissionReviewer = (action, signal) =>
     withPermissionReviewRoute(

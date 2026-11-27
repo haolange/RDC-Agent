@@ -369,7 +369,8 @@ export class AgentPermissionPolicyService {
           : request(
               mode,
               'Changing the owning replay requires authorization under the current permission mode.',
-              'medium',
+              // Returning to the user's own signed position is the safest change there is.
+              replayAction === 'capture_restore' ? 'low' : 'medium',
             );
       const floor = input.compiledPolicy
         ? resolvePolicyApprovalFloor(input.compiledPolicy, toolName, 'mutation')

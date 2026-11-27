@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { AppError } from '@shared/errors/appError';
 import type { AdmissionCheck } from '@shared/constants/admissionChecks';
 import type { AgentAccessCeiling } from '@shared/types/agentManifest';
+import type { CaptureReadiness } from '@shared/types/captureReplay';
 import type { ToolCall } from '@shared/types/tool';
 import type { AgentTool, ToolExecutionContext } from '../agent/AgentTool';
 import type { AgentPermissionDecision } from './AgentPermissionPolicy';
@@ -12,7 +13,8 @@ import type { InvestigationPlanContract } from '../../sessions/run/investigation
  * Admission: a pending action under auto-review is decided by host-verified facts first. The review model only sees
  * what those facts cannot settle. Domain adapters compute the facts; this module owns the order of decision.
  */
-export type AdmissionFactState = 'holds' | 'fails' | 'unavailable';
+/** A fact the host cannot verify fails: a text model cannot verify host state either. */
+export type AdmissionFactState = 'holds' | 'fails';
 
 export interface AdmissionFact {
   check: AdmissionCheck;
@@ -41,8 +43,8 @@ export interface AdmissionTurn {
   agentId: string;
   accessCeiling: AgentAccessCeiling;
   approved: ApprovedAdmissionScope | null;
-  /** The signed entry position of this turn's capture; throws when the record does not match its owner. */
-  captureBaseline: () => { available: true } | { available: false; reason: string };
+  /** Whether the turn's approved capture can change now, or null when the turn owns no approved capture. */
+  captureReadiness: () => CaptureReadiness | null;
 }
 
 export interface AdmissionRequest {
@@ -69,8 +71,8 @@ const ruleVerdict = (verdict: PermissionReviewVerdict): AdmissionRoute => ({ rou
 
 /**
  * The order of decision. Without an adapter a low-risk action is admitted by rule and anything else goes to the model.
- * With one, a failing fact refuses, a covered action whose facts all hold is admitted, and the rest goes to the model
- * with the facts attached.
+ * With one, a failing fact refuses, a covered action whose facts all hold is admitted, and an uncovered one goes to the
+ * model with its facts attached.
  */
 export function decideAdmission(
   assessment: AdmissionAssessment | null,
@@ -88,7 +90,7 @@ export function decideAdmission(
       failedChecks: [...new Set(failing.map((fact) => fact.check))],
       reason: failing.map((fact) => fact.basis).join(' '),
     });
-  if (assessment.coverage === 'covered' && assessment.facts.every((fact) => fact.state === 'holds'))
+  if (assessment.coverage === 'covered')
     return ruleVerdict({
       verdict: 'allow',
       failedChecks: [],

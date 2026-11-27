@@ -379,7 +379,11 @@ rebuild 的结论签进恢复 intent 回执。quarantined 不触碰现场，也�
 
 恢复的 transition 回执带 `lostWithProcess`，只记事实、从不声称回滚：旧 replay session 的全部 debug handle 失效；恢复时仍开着的实验（running/polluted）记为 `interrupted-by-infrastructure`，恢复不再等待模型先关闭它们，实验记录本身仍由模型更新；最近核验位置上的 replacement 数与指纹（`rolledBack: false`，随进程丢失）；rebuild 时已确认退出的 worker；`newBaselineRequired: true`。旧 baseline/intervention 回执仍绑定旧进程身份，五阶段验收要求同一 context 与 lease，所以重建后必须重新取 baseline，旧实验不会跨新旧现场拼接。
 
-**卡死的自主处置**：`executeRdcShell` 把 `RDC_OPERATION_STUCK` / `RDC_WORKER_LOST` 经 `registerRdcFault` 登记（原因写明 worker 栈日志路径）。失败交付给模型之前，`ToolExecutorFactory` 对获批 capture 运行 `settleRdcProcessFault`（`src/main/agent-runtime/orchestration/RdcProcessFaultRecovery.ts`）：权限为 full-access 或 auto-review 时，`classifyFault` 只读判定，结论为 rebuild 就以与 `capture_recover` 相同的 prepare + recover（独占资源、同样的签名回执与 runtime epoch）重建，并把 `runtimeRecovery`（新回执、当前位置、需要新 baseline）附在该次失败结果上，turn 继续；结论为 quarantined 或恢复失败时，结果带具体阻塞码，turn 在这次调用后结束，诊断为 `CONVERSATION_RDC_RECOVERY_BLOCKED`，复制详情含阻塞码。其它权限模式只附结论：rebuild/keep 时提示可用 `capture_recover`（照常经审批），quarantined 时报告阻塞码，turn 不中止。每一步恢复（判定、成功、失败）在生命周期账本写一条 `recovery_step`（结论、第几次尝试、阻塞码）。
+**宿主自动恢复**：一次工具调用让 owning lease 进入隔离时（不论原因是卡死的 worker、丢失的 daemon 还是不确定的原生结果），`ToolExecutorFactory` 在这次调用的结果返回之前对获批 capture 运行 `recoverQuarantinedCapture`（`src/main/agent-runtime/orchestration/RuntimeCaptureRecovery.ts`），与权限模式无关：
+- 它以与 `capture_recover` 相同的 prepare + recover（独占资源、同样的签名回执与 runtime epoch）重建，并把 `runtimeRecovery`（新回执、当前位置、需要新 baseline）附在该次结果上，turn 继续。
+- 判定为 quarantined 或恢复失败时，结果带具体阻塞码与出口（`agent-recover`、`ask-user` 或 `restart`，见 `captureExitFor`）。turn 不中止，由 Agent 按出口用 `ask_user` 请用户处理，或稍后再调用 `capture_recover`。
+- 恢复刚重建过的同一故障（操作、参数指纹与错误码相同）紧接着再次出现时，不再重建（`RDC_RECOVERY_REPEATED_FAULT`），出口为 `ask-user`。
+- 每一步恢复（判定、成功、失败）在生命周期账本写一条 `recovery_step`（结论、第几次尝试、阻塞码）。
 
 Agent 恢复的次数按回合计：`RdcLifecycleReceipts.recoveryAttempts` 从会话里已签名的回执统计本回合对同一 {输入、内容 hash、设备} 签下的恢复 intent（每次实际动手一条，失败的另有 failed 回执指向它），重启后仍然有效；达到 `RDC_RECOVERY_ATTEMPT_LIMIT`（2）后 `classifyRecovery` 先于身份链判 `RDC_RECOVERY_BUDGET_EXHAUSTED`。被拒的判定不签 intent，因此不消耗次数。新回合重新计数。没有内存里的"已恢复过"集合。用户在 Capture 面板发起的恢复每次都是人的明确操作，不计入、也不受此预算限制。
 

@@ -521,6 +521,7 @@ export const enErrors = {
   'errors.RDC_RECEIPT_KEY_UNAVAILABLE': "The key for replay records can't be read.",
   'errors.RDC_RECOVERY_BLOCKED': "The replay hasn't exited yet, so it can't be recovered.",
   'errors.RDC_RECOVERY_BUDGET_EXHAUSTED': 'This capture has used its recovery attempts. Check the capture and device.',
+  'errors.RDC_RECOVERY_REPEATED_FAULT': 'The same failure came back right after the replay was rebuilt.',
   'errors.RDC_RECOVERY_DEVICE_UNAVAILABLE': "The replay device isn't ready for recovery.",
   'errors.RDC_REMOTE_UPGRADE_REQUIRED': 'RDC-Tool needs an update to prepare Android devices.',
   'errors.RDC_REPLAY_BUSY': 'The capture is opening or closing. Wait for it to finish.',

@@ -1,4 +1,3 @@
-import { AppError } from '@shared/errors/appError';
 import { GENERAL_AGENT_ID } from '@shared/types/agent';
 import { parseShellRdcInput } from './RdcShellInput';
 import { reviewableEffects, rollbackFor, targetMatches } from './rdcInterventionAuthorization';
@@ -113,28 +112,10 @@ function assessIntervention(
   const authorizations = (approved?.contract?.authorizations ?? []).filter(
     (item) => item.operation === input.operation,
   );
-  if (!approved || !authorizations.length)
-    return {
-      coverage: 'uncovered',
-      facts: [
-        {
-          check: 'authorized',
-          state: 'unavailable',
-          basis: 'No approved authorization names this intervention; decide from the user request and approved plan.',
-        },
-        ...facts,
-      ],
-    };
+  // No authorization, or one for another target: the plan could not name this draw in advance, so whether the change
+  // is within what the user approved is the semantic remainder the review model decides, with these facts.
   const authorization = authorizations.find((item) => targetMatches(item.target, input.args));
-  if (!authorization)
-    return {
-      coverage: 'covered',
-      facts: [
-        fact('authorized', true, 'The approved plan authorizes this intervention.'),
-        fact('target-matches', false, 'The action changes a different target than the approved plan names.'),
-        ...facts,
-      ],
-    };
+  if (!approved || !authorization) return { coverage: 'uncovered', facts };
   const applied = receipts.filter(
     (receipt) =>
       receipt.evidence.kind === 'intervention' &&
@@ -178,27 +159,38 @@ function assessIntervention(
 }
 
 /**
- * Host facts for changing the owning replay. The approved plan's capture scope is the authorization: selecting a
- * scoped input, restoring the signed entry position and recovering the same capture are all within it.
+ * Host facts for changing the owning replay. The approved plan's capture scope is the authorization; whether the
+ * replay can change now is the controller's readiness, the same answer execution and the Capture panel read. Selecting
+ * a scoped input, restoring the signed entry position and recovering the same capture are all within the scope.
  */
 function assessReplayLifecycle(request: AdmissionRequest, turn: AdmissionTurn): AdmissionAssessment | null {
   const step = request.tool.spec.capture?.replayLifecycle?.(request.toolCall.arguments) ?? null;
   if (!step) return null;
   const scope = turn.approved?.contract?.captureScope?.inputs.map((entry) => entry.inputId) ?? null;
+  const owner = turn.agentId === GENERAL_AGENT_ID && turn.accessCeiling === 'full';
+  const readiness = turn.captureReadiness();
+  // A quarantine blocks every change but the recovery that acts on it.
+  const usable =
+    readiness !== null &&
+    (readiness.state === 'ready' || (readiness.exit === 'agent-recover' && step === 'capture_recover'));
   const facts: AdmissionFact[] = [
-    scope
-      ? fact('authorized', true, "The approved plan's capture scope covers changing the owning replay.")
-      : {
-          check: 'authorized',
-          state: 'unavailable',
-          basis: 'No approved plan with a capture scope belongs to this execution.',
-        },
+    fact(
+      'authorized',
+      scope !== null,
+      scope
+        ? "The approved plan's capture scope covers changing the owning replay."
+        : 'No approved plan with a capture scope belongs to this execution.',
+    ),
     fact(
       'identity-current',
-      turn.agentId === GENERAL_AGENT_ID && turn.accessCeiling === 'full',
-      turn.agentId === GENERAL_AGENT_ID && turn.accessCeiling === 'full'
-        ? 'This is the owning execution turn with a full access ceiling.'
-        : 'Only the owning execution turn with a full access ceiling changes the replay.',
+      owner && usable,
+      !owner
+        ? 'Only the owning execution turn with a full access ceiling changes the replay.'
+        : usable
+          ? 'This is the owning execution turn and its replay can change now.'
+          : readiness === null
+            ? 'This turn owns no approved capture.'
+            : `The replay cannot change now (${readiness.state === 'blocked' ? readiness.code : 'ready'}).`,
     ),
   ];
   if (step === 'capture_select' && scope) {
@@ -214,24 +206,7 @@ function assessReplayLifecycle(request: AdmissionRequest, turn: AdmissionTurn): 
       ),
     );
   }
-  if (step === 'capture_restore') facts.push(entryBaseline(turn));
-  return { coverage: scope ? 'covered' : 'uncovered', facts };
-}
-
-function entryBaseline(turn: AdmissionTurn): AdmissionFact {
-  try {
-    const baseline = turn.captureBaseline();
-    return baseline.available
-      ? fact('baseline-recorded', true, 'The entry position of this turn is signed and owned by it.')
-      : {
-          check: 'baseline-recorded',
-          state: 'unavailable',
-          basis: `The entry position of this turn is not verified (${baseline.reason}).`,
-        };
-  } catch (error) {
-    if (!(error instanceof AppError)) throw error;
-    return fact('baseline-recorded', false, 'The signed entry position does not match this turn.');
-  }
+  return { coverage: 'covered', facts };
 }
 
 /** What the adapter reads from the host: the session's signed receipts and the turn's hold on the owning replay. */

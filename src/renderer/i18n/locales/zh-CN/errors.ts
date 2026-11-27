@@ -491,6 +491,7 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.RDC_RECEIPT_KEY_UNAVAILABLE': '无法读取回放回执的密钥。',
   'errors.RDC_RECOVERY_BLOCKED': '回放尚未退出，暂时无法恢复。',
   'errors.RDC_RECOVERY_BUDGET_EXHAUSTED': '这份 capture 的恢复次数已用完，请检查 capture 和设备。',
+  'errors.RDC_RECOVERY_REPEATED_FAULT': '回放刚重建，同样的故障又出现了。',
   'errors.RDC_RECOVERY_DEVICE_UNAVAILABLE': '回放设备尚未就绪，无法恢复。',
   'errors.RDC_REMOTE_UPGRADE_REQUIRED': 'RDC-Tool 需要更新才能准备 Android 设备。',
   'errors.RDC_REPLAY_BUSY': 'capture 正在打开或关闭，请等待完成。',

@@ -249,8 +249,6 @@ export class TurnHandle {
   taskPreparation: import('@shared/types/taskExecution').TaskExecutionPreparation | null = null;
   runtimeEpochs: import('../tasks/taskExecutionSchemas').TaskRuntimeEpoch[] = [];
   captureControl: import('./ApprovedCaptureController').ApprovedCaptureController | null = null;
-  /** Set when an autonomous recovery of a stuck replay was refused: the turn ends under this code after that call. */
-  rdcRecoveryBlocker: { toolCallId: string; code: string; reason: string } | null = null;
   /** Structured model-declared completion, populated only by turn_complete. */
   completionDeclaration: TurnCompletionDeclaration | null = null;
   /** Frozen domain preconditions checked before a completion declaration is recorded. */

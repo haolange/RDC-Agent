@@ -15,7 +15,7 @@ import {
 } from '../agent-runtime/providers/internal/http';
 import { MissionCompletionError } from '../investigation/missionCompletionContract';
 import { InvestigationError } from '../investigation/investigationErrors';
-import { RdcRecoveryBlockedError } from '../agent-runtime/orchestration/RdcProcessFaultRecovery';
+import { RdcRecoveryBlockedError } from '../agent-runtime/orchestration/RuntimeCaptureRecovery';
 import { createTurnFailedDiagnostic } from './ConversationTurnDiagnostic';
 
 const ROUTE = {
