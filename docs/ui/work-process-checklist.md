@@ -5,6 +5,7 @@
 ## 运行态
 
 - 顶层标题「工作中 / Working」+ Active Signal clipped-gradient 能量扫光（`active-signal-shimmer`，1.6s / 200% / 36% wash，循环整格平铺）。
+- 还没有可见内容时只有这一行标题与时钟（不可点、无箭头）；结束时仍为空的回合不留「工作过程」。
 - loop thinking 运行态默认展开（summary/raw/unknown 与 final-answer/收束 thinking 同一生命周期）。
 - Active Signal「正在思考 / Thinking」。
 - 每个有可见内容的模型段落各有一个活动节点；纯工具段也有节点。执行中的工具标题扫光，审批等待、失败、取消和完成后停止。

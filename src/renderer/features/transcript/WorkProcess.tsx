@@ -76,8 +76,24 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer,
   const failureMeta =
     presentation.failureCount > 0 ? t('chat.workProcessFailures', { count: presentation.failureCount }) : '';
   const hasBody = Boolean(presentation.summary) || presentation.rows.length > 0;
-  // Blocks with nothing to show yet (runtime bookkeeping) do not open an empty Working while the turn runs.
-  if (inProgress && !hasBody) return null;
+  // A settled turn with nothing to show leaves no Working behind.
+  if (!inProgress && !hasBody) return null;
+  // While the turn runs with nothing to show yet, the header alone says it is working and for how long.
+  if (!hasBody) {
+    return (
+      <section className={`work-process status-${trace.status} is-collapsed`} data-testid="work-process">
+        <div className="work-process-header is-static" role="status">
+          <span className={`work-process-status-dot status-${trace.status}`} aria-hidden="true" />
+          <span className="work-process-heading-copy">
+            <ActiveSignalText active={running} tone="info" className={`work-process-label status-${trace.status}`}>
+              {headlineCopy}
+            </ActiveSignalText>
+            {durationMeta ? <span className="work-process-meta">{durationMeta}</span> : null}
+          </span>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section
@@ -110,11 +126,9 @@ const WorkProcessBody: React.FC<WorkProcessProps> = ({ trace, sessionId, answer,
         <Chevron open={expanded} size={12} className="work-process-caret" />
       </PlainButton>
 
-      {hasBody ? (
-        <WorkProcessFoldProvider value={!expanded}>
-          <WorkProcessContent presentation={presentation} sessionId={sessionId} active={inProgress} />
-        </WorkProcessFoldProvider>
-      ) : null}
+      <WorkProcessFoldProvider value={!expanded}>
+        <WorkProcessContent presentation={presentation} sessionId={sessionId} active={inProgress} />
+      </WorkProcessFoldProvider>
     </section>
   );
 };

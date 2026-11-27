@@ -195,8 +195,8 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
       >
         <div className="conversation-message-row">
           <div className="conversation-message-stack">
-            {/* Working appears with its first content; a request still preparing shows no empty card. */}
-            {trace && (trace.blocks.length > 0 || trace.summary) ? (
+            {/* A running turn always shows it is working; a settled one shows Working only when it has content. */}
+            {trace && (trace.status === 'running' || trace.blocks.length > 0 || trace.summary) ? (
               <WorkProcess
                 trace={trace}
                 sessionId={message.sessionId}
