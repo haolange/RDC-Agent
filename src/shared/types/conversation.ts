@@ -176,6 +176,10 @@ export interface ConversationInterruptedDiagnostic extends Omit<ConversationMess
 export type ConversationMessageDiagnostic =
   ConversationMessageDiagnosticBase | ConversationContinuationDropDiagnostic | ConversationInterruptedDiagnostic;
 
+/** What the host did about a replay this call left isolated: rebuilt it, or could not and named who can. */
+export type ConversationRuntimeRecovery =
+  { status: 'rebuilt' } | { status: 'blocked'; code: string; exit: import('./captureReplay').CaptureExit };
+
 export interface ConversationToolCall {
   /** Runtime Hook events owned by this exact call, in arrival order. */
   hookDiagnostics?: Array<{
@@ -209,6 +213,8 @@ export interface ConversationToolCall {
   imagePreviews?: ConversationToolImagePreviewRef[];
   error?: string;
   approval?: ConversationToolApproval;
+  /** The host's recovery of the replay this call left isolated. */
+  runtimeRecovery?: ConversationRuntimeRecovery;
   /** Scheduler start, separate from the earlier model declaration timestamp. */
   executionStartedAt?: number;
   /** First visible event order within this trace; updates retain the original position. */

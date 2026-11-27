@@ -192,6 +192,11 @@ export const enControl = {
     'Restoring may close the current replay and reconnect the original device. It will not resume the investigation.',
   'control.replay.recoveryAction': 'Restore position',
   'control.replay.recoveryFailed': 'Recovery state could not be confirmed',
+  'control.replay.rebuildPending': 'Replay needs a rebuild',
+  'control.replay.rebuildOwned': 'Replay is isolated; the investigation rebuilds it',
+  'control.replay.rebuildDescription':
+    "The last operation's outcome couldn't be confirmed, so the replay is isolated. Rebuilding reopens this capture on the same device and doesn't continue the investigation.",
+  'control.replay.rebuildAction': 'Rebuild replay',
   'control.replay.refresh': 'Refresh captures and devices',
   'control.replay.imageLoading': 'Loading image',
   'control.replay.eventNumber': 'Event {id}',

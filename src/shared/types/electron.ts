@@ -558,7 +558,7 @@ export interface ElectronAPI {
     readLivePreview: (scope: SessionScope) => Promise<Uint8Array>;
     getReplayState: (scope: SessionScope) => Promise<CaptureReplayState>;
     getRecovery: (scope: SessionScope) => Promise<import('./captureReplay').CaptureRecoveryStatus | null>;
-    restorePrevious: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<CaptureReplayState>;
+    recover: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<CaptureReplayState>;
     applyReplayEvent: (request: CaptureReplayApplyRequest) => Promise<CaptureReplayState>;
     refreshFrame: (scope: import('./captureReplay').CaptureReplayBindingRequest) => Promise<CaptureReplayState>;
     list: (scope: SessionScope) => Promise<{ captures: CaptureDescriptor[] }>;

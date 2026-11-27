@@ -26,6 +26,7 @@ import { useCaptureReplay } from './useCaptureReplay';
 import { useCaptureRecovery } from './useCaptureRecovery';
 import { useCaptureActions, type CaptureAction } from './useCaptureActions';
 import { CaptureRecoveryCallout } from './CaptureRecoveryCallout';
+import type { CaptureRecoveryStatus } from '@shared/types/captureReplay';
 import type { CaptureScope } from './capturePanelActions';
 import type { RdcContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
 import './CaptureReplay.css';
@@ -85,7 +86,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
     deviceId === 'local'
       ? t('device.local')
       : (devices.find((device) => device.id === deviceId)?.label ?? t('control.replay.unknownDevice'));
-  const originalRecovery = recovery.status?.original;
+  const originalRecovery = restoreTarget(recovery.status);
   const showRecoveryTarget =
     originalRecovery &&
     (originalRecovery.inputId !== selectedInput?.inputId || originalRecovery.deviceId !== targetDeviceId);
@@ -183,7 +184,7 @@ function ScopedCapturePanel({ scope, capture }: { scope: CaptureScope; capture: 
           if (!state) return;
           setRestoring(true);
           void recovery
-            .restore(state.generation)
+            .recover(state.generation)
             .then(async (next) => {
               if (next) {
                 receive(next);
@@ -244,4 +245,9 @@ export function CapturePanel({
   ) : (
     <span>{t('control.replay.noSession')}</span>
   );
+}
+
+/** The signed position a restore returns to; a rebuild names no earlier position. */
+function restoreTarget(status: CaptureRecoveryStatus | null) {
+  return status?.kind === 'restore' ? status.original : null;
 }

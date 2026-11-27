@@ -154,8 +154,23 @@ const buildToolRow = (call: ConversationToolCall, t: LocalizedTranslator): WorkP
     diagnosticCaption,
     hookDiagnostics: call.hookDiagnostics,
     approval,
+    recovery: runtimeRecoveryLine(call.runtimeRecovery, t),
     imagePreviews: call.imagePreviews,
     ...webPresentation,
+  };
+};
+
+/** The host's recovery as one sentence: rebuilt, or not rebuilt and who can make it usable again. */
+const runtimeRecoveryLine = (
+  recovery: ConversationToolCall['runtimeRecovery'],
+  t: Translator,
+): Extract<WorkProcessRow, { type: 'tool' }>['recovery'] => {
+  if (!recovery) return undefined;
+  if (recovery.status === 'rebuilt') return { text: t('chat.runtimeRecovery.rebuilt'), tone: 'success' };
+  const reason = humanizeError(recovery.code, t, 'control.replay.recoveryFailed');
+  return {
+    text: t(recovery.exit === 'restart' ? 'chat.runtimeRecovery.restart' : 'chat.runtimeRecovery.askUser', { reason }),
+    tone: 'warning',
   };
 };
 

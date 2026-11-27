@@ -324,7 +324,7 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 - 历史结果不回填；原模型请求只能通过 owning root General 的 hash-bound `artifact_read.includeRecordedRequest` 从已提交的 SessionContextJournal 生成独立限定来源凭据，再显式授予审查者。
 - 正在执行的 turn 尚未提交，同一 turn 内重复查询不能取回其原请求；不可用时不从 native 参数或其他来源伪造模型请求。
 
-原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态，并提供关闭后重新打开的恢复入口。
+原生调用失败导致 owning lease 被隔离后，Capture 在执行锁释放时立即投影错误状态、清除旧设备呈现成功状态。`captureRecoveryStatus` 给出两种入口，都经 `capture:recover` 调用同一个 `recoverSessionCapture`：有未闭合的签名位置时为「恢复原位置」（`restore`）；没有位置可回、但回放被隔离或进入 error 时为「重建回放」（`rebuild`）。获批回合持锁时入口禁用，由宿主自动恢复。
 
 - `runtime_context` 对同一 session/project 的隔离身份返回明确的受控恢复状态，不将仍打开的 capture 误报为未打开，也不向其他 scope 泄露保留的 lease。
 - 新 turn 不解除隔离，也不将隔离误报为需要重新准备的 CLI 绑定变化：`prepareTurn` 把本会话被隔离的 lease 身份冻结进 binding（其余原生路径照旧拒绝它），获批同一计划的新 turn 在 `ApprovedCaptureController.initialize` 中接续上一 turn 未闭合的签名 baseline（仍是用户的原始位置），以该 lease 上最近一次签名位置为 `lastVerified`，进入待恢复状态：只放行 `capture_recover`，其他现场操作返回 `RDC_CONTEXT_QUARANTINED`；恢复成功后正常工作，终态 `resolved` 以原 baseline 的 turn 签署。
@@ -366,7 +366,7 @@ Tools 的 batch 仅增加 CLI 子命令，复用同 Python 客户端的 catalog 
 
 ### 身份链恢复
 
-恢复准入只有一个函数 `classifyRecovery`（`src/main/rdc/RdcRecoveryClassification.ts`），Agent 的 `capture_recover`（`ApprovedCaptureHost.inspectRecovery` 经 `inspectQuarantinedCapture`）与用户在 Capture 面板的恢复（`restorePreviousCapture`，关闭隔离 context 之前）都用它。输入是主进程最近核验的 daemon/worker 身份（`lastVerified`，随成功结果的 `meta.process_identity` 刷新）、只读 `context status` 与设备动作是否未决：
+恢复准入只有一个函数 `classifyRecovery`（`src/main/rdc/RdcRecoveryClassification.ts`），Agent 的 `capture_recover`（`ApprovedCaptureHost.inspectRecovery` 经 `inspectQuarantinedCapture`）与用户在 Capture 面板的恢复（`recoverSessionCapture`，经 `capture:recover`，关闭隔离 context 之前）都用它。输入是主进程最近核验的 daemon/worker 身份（`lastVerified`，随成功结果的 `meta.process_identity` 刷新）、只读 `context status` 与设备动作是否未决：
 
 | 结论 | 条件 |
 | --- | --- |

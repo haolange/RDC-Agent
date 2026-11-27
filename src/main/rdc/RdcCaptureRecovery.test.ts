@@ -75,7 +75,8 @@ vi.mock('./RdcLifecycleReceipts', async (importOriginal) => ({
   rdcLifecycleReceipts: { pending: mock.pending, write: mock.write },
 }));
 
-import { captureRecoveryStatus, recoverSessionCapture, restorePreviousCapture } from './RdcCaptureRecovery';
+import { captureRecoveryStatus, recoverSessionCapture } from './RdcCaptureRecovery';
+
 import { freezeRdcTurnBinding } from './RdcTurnBindings';
 const cli = {
   enabled: true,
@@ -121,6 +122,7 @@ const baseline = {
   original,
 };
 const scope = { projectId: 'p', sessionId: 's', bindingGeneration: 0 };
+const byUser = { kind: 'user', bindingGeneration: 0 } as const;
 let state: Record<string, unknown>;
 let lease: Record<string, unknown> | null;
 let opened: Record<string, unknown> | null;
@@ -215,9 +217,13 @@ beforeEach(() => {
 });
 
 it('reopens and verifies the saved capture and position only after the user requests recovery', async () => {
-  expect(captureRecoveryStatus(scope)).toMatchObject({ pendingCount: 1, original: { fileName: 'a.rdc', eventId: 42 } });
+  expect(captureRecoveryStatus(scope)).toMatchObject({
+    kind: 'restore',
+    pendingCount: 1,
+    original: { fileName: 'a.rdc', eventId: 42 },
+  });
   expect(mock.prepare).not.toHaveBeenCalled();
-  const result = await restorePreviousCapture(scope);
+  const result = await recoverSessionCapture(scope, byUser);
   expect(result.appliedEventId).toBe(42);
   expect(mock.prepare).toHaveBeenCalledOnce();
   expect(mock.open).toHaveBeenCalledOnce();
@@ -230,7 +236,7 @@ it('reopens and verifies the saved capture and position only after the user requ
 
 it('preserves the current replay when input identity changed or an old process may still be alive', async () => {
   mock.verify.mockResolvedValueOnce('d'.repeat(64));
-  await expect(restorePreviousCapture(scope)).rejects.toThrow('RDC_RECOVERY_INPUT_CHANGED');
+  await expect(recoverSessionCapture(scope, byUser)).rejects.toThrow('RDC_RECOVERY_INPUT_CHANGED');
   expect(mock.clear).not.toHaveBeenCalled();
   expect(mock.prepare).not.toHaveBeenCalled();
   const withDaemon = (start_generation: string) => ({
@@ -246,22 +252,24 @@ it('preserves the current replay when input identity changed or an old process m
     ],
   });
   mock.pending.mockReturnValue(withDaemon(currentProcessIdentity().birth));
-  await expect(restorePreviousCapture(scope)).rejects.toThrow('RDC_RECOVERY_OLD_PROCESS_UNCONFIRMED');
+  await expect(recoverSessionCapture(scope, byUser)).rejects.toThrow('RDC_RECOVERY_OLD_PROCESS_UNCONFIRMED');
   expect(mock.clear).not.toHaveBeenCalled();
   expect(mock.write).not.toHaveBeenCalled();
   // The same pid under another birth is a reused pid: the recorded daemon has exited.
   mock.pending.mockReturnValue(withDaemon('windows-filetime:1'));
-  await expect(restorePreviousCapture(scope)).resolves.toMatchObject({ appliedEventId: 42 });
+  await expect(recoverSessionCapture(scope, byUser)).resolves.toMatchObject({ appliedEventId: 42 });
 });
 
 it('does not take over an active turn or accept a stale UI generation', async () => {
   setRdcInteractionLock('s', 'foreign', true);
   try {
-    await expect(restorePreviousCapture(scope)).rejects.toThrow('RDC_INTERACTION_LOCKED');
+    await expect(recoverSessionCapture(scope, byUser)).rejects.toThrow('RDC_INTERACTION_LOCKED');
   } finally {
     setRdcInteractionLock('s', 'foreign', false);
   }
-  await expect(restorePreviousCapture({ ...scope, bindingGeneration: 7 })).rejects.toThrow('RDC_BINDING_CHANGED');
+  await expect(recoverSessionCapture(scope, { kind: 'user', bindingGeneration: 7 })).rejects.toThrow(
+    'RDC_BINDING_CHANGED',
+  );
   expect(mock.prepare).not.toHaveBeenCalled();
 });
 
@@ -287,7 +295,7 @@ it('closes a quarantined replay only when the shared admission explains its proc
   replaced.worker_lifecycle = [];
   replaced.sessions[0]!.recovery.worker_exit = null;
   mock.status.mockResolvedValueOnce(replaced);
-  await expect(restorePreviousCapture(scope)).rejects.toThrow('RDC_RECOVERY_PROCESS_UNEXPLAINED');
+  await expect(recoverSessionCapture(scope, byUser)).rejects.toThrow('RDC_RECOVERY_PROCESS_UNEXPLAINED');
   expect(mock.clear).not.toHaveBeenCalled();
   expect(mock.ledger).toHaveBeenLastCalledWith(
     expect.objectContaining({
@@ -298,7 +306,7 @@ it('closes a quarantined replay only when the shared admission explains its proc
     }),
   );
   mock.status.mockResolvedValueOnce(stuckContextStatus());
-  expect((await restorePreviousCapture(scope)).appliedEventId).toBe(42);
+  expect((await recoverSessionCapture(scope, byUser)).appliedEventId).toBe(42);
   expect(mock.clear).toHaveBeenCalledOnce();
   expect(mock.status).toHaveBeenLastCalledWith(expect.objectContaining({ contextId: 'old' }));
   expect(mock.ledger).toHaveBeenLastCalledWith(expect.objectContaining({ decision: 'rebuild' }));
@@ -323,6 +331,10 @@ it('rebuilds a quarantined replay with no signed baseline for the owning turn be
     runtimeContext: { captureFileId: 'file', replaySessionId: 'replay' },
   };
   mock.observed.mockReturnValue(processIdentity);
+  expect(captureRecoveryStatus(scope)).toEqual({
+    kind: 'rebuild',
+    input: { inputId: 'a', fileName: 'a.rdc', deviceId: 'local' },
+  });
   mock.status.mockResolvedValueOnce(stuckContextStatus());
   // The turn recovers under its own lock; nothing else may hold the session meanwhile.
   await expect(recoverSessionCapture(scope, { kind: 'turn', turnId: 'turn-1' })).rejects.toThrow(

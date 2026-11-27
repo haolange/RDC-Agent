@@ -252,7 +252,7 @@
     },
     "src/renderer/features/right-rail/CapturePanel.tsx": {
       "lines": 194,
-      "complexity": 71
+      "complexity": 70
     },
     "src/renderer/features/right-rail/CaptureReplayControls.tsx": {
       "lines": 164,

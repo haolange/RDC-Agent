@@ -33,11 +33,7 @@ import type { SessionScope } from '@shared/types/session';
 import type { RdcCliInvokerSettings } from '@shared/types/settings';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type { RdcTurnBinding } from './RdcTurnBindings';
-import type {
-  CaptureRecoveryStatus,
-  CaptureReplayBindingRequest,
-  CaptureReplayState,
-} from '@shared/types/captureReplay';
+import type { CaptureRecoveryStatus, CaptureReplayState } from '@shared/types/captureReplay';
 
 function authorize(scope: SessionScope): void {
   if (sessionRecordStore.readSession(scope.sessionId)?.projectId !== scope.projectId)
@@ -46,19 +42,27 @@ function authorize(scope: SessionScope): void {
 
 export function captureRecoveryStatus(scope: SessionScope): CaptureRecoveryStatus | null {
   authorize(scope);
+  const fileNameOf = (inputId: string) =>
+    projectWorkspaceStore.getProjectById(scope.projectId)?.inputs.find((value) => value.inputId === inputId)
+      ?.fileName ?? inputId;
   const pending = rdcLifecycleReceipts.pending(scope.sessionId, scope.projectId);
-  if (!pending) return null;
+  if (!pending) {
+    const state = rdcSessionService.snapshotReplayForSession(scope);
+    return sessionCaptureFaulted(scope) && state.inputId && state.replayDeviceId
+      ? {
+          kind: 'rebuild',
+          input: { inputId: state.inputId, fileName: fileNameOf(state.inputId), deviceId: state.replayDeviceId },
+        }
+      : null;
+  }
   const original = pending.baseline.original;
-  const fileName = original
-    ? projectWorkspaceStore.getProjectById(scope.projectId)?.inputs.find((value) => value.inputId === original.inputId)
-        ?.fileName
-    : undefined;
   return {
+    kind: 'restore',
     pendingCount: pending.count,
     original: original
       ? {
           inputId: original.inputId,
-          fileName: fileName ?? original.inputId,
+          fileName: fileNameOf(original.inputId),
           deviceId: original.deviceId,
           eventId: original.native.eventId,
         }
@@ -68,11 +72,6 @@ export function captureRecoveryStatus(scope: SessionScope): CaptureRecoveryStatu
 
 /** Who recovers a session's replay: a person from Capture, or the owning turn before its model starts. */
 export type CaptureRecoveryAuthority = { kind: 'user'; bindingGeneration: number } | { kind: 'turn'; turnId: string };
-
-/** A user click recovers the session's replay; it never starts an Agent. */
-export async function restorePreviousCapture(scope: CaptureReplayBindingRequest): Promise<CaptureReplayState> {
-  return recoverSessionCapture(scope, { kind: 'user', bindingGeneration: scope.bindingGeneration });
-}
 
 /** The replay needs a rebuild: its lease is quarantined, or an opened capture failed into the error phase. */
 export function sessionCaptureFaulted(scope: SessionScope): boolean {

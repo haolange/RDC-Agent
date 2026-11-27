@@ -39,7 +39,7 @@ vi.mock('./useCaptureReplay', () => ({
   }),
 }));
 vi.mock('./useCaptureRecovery', () => ({
-  useCaptureRecovery: () => ({ status: state.recovery, error: null, restore: state.restoreRecovery }),
+  useCaptureRecovery: () => ({ status: state.recovery, error: null, recover: state.restoreRecovery }),
 }));
 vi.mock('./useCapturePreview', () => ({
   useCapturePreview: (_scope: unknown, source: { imagePath?: string | null }) => ({
@@ -148,6 +148,7 @@ beforeEach(() => {
 describe('populated session rail', () => {
   it('shows the saved position and requires an explicit unlocked restore action', async () => {
     state.recovery = {
+      kind: 'restore',
       pendingCount: 1,
       original: { inputId: 'input', fileName: 'Scene.rdc', deviceId: 'local', eventId: 21 },
     };

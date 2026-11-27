@@ -90,7 +90,14 @@ export type CaptureExit = 'agent-recover' | 'ask-user' | 'restart';
 /** Whether live capture work may run now; every surface that asks reads this one answer. */
 export type CaptureReadiness = { state: 'ready' } | { state: 'blocked'; code: ErrorCode; exit: CaptureExit };
 
-export interface CaptureRecoveryStatus {
-  pendingCount: number;
-  original: { inputId: string; fileName: string; deviceId: string; eventId: number } | null;
-}
+/**
+ * What the Capture panel offers when the session's replay needs recovery: return to an unresolved signed position, or
+ * rebuild a replay that failed with no such position to return to.
+ */
+export type CaptureRecoveryStatus =
+  | {
+      kind: 'restore';
+      pendingCount: number;
+      original: { inputId: string; fileName: string; deviceId: string; eventId: number } | null;
+    }
+  | { kind: 'rebuild'; input: { inputId: string; fileName: string; deviceId: string } };

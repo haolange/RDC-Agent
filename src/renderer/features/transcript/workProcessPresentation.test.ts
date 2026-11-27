@@ -145,6 +145,25 @@ it('shows a user approval handed over by an undecidable auto-review as such, wit
   expect(row.approval?.metaLines).not.toContain('人工审批');
 });
 
+it.each([
+  [{ status: 'rebuilt' }, { tone: 'success', text: '回放已自动重建，进行中的实验已中断，之后要重新取基线。' }],
+  [
+    { status: 'blocked', code: 'RDC_RECOVERY_PROCESS_UNEXPLAINED', exit: 'restart' },
+    { tone: 'warning', text: expect.stringContaining('重启应用后可以继续') },
+  ],
+  [
+    { status: 'blocked', code: 'RDC_RECOVERY_REPEATED_FAULT', exit: 'ask-user' },
+    { tone: 'warning', text: '回放没能自动重建：回放刚重建，同样的故障又出现了。需要你处理后才能继续。' },
+  ],
+] as const)('reads the host replay recovery %j as one sentence on the card', (runtimeRecovery, recovery) => {
+  const row = createToolRowForPresentation(
+    { id: 'recovered', toolName: 'shell', status: 'error', startedAt: now, completedAt: now + 5, runtimeRecovery },
+    t,
+  );
+  if (row.type !== 'tool') throw new Error('Expected tool row');
+  expect(row.recovery).toEqual(recovery);
+});
+
 it('keeps a post-approval native error separate from an operation-preflight rejection', () => {
   const row = createToolRowForPresentation(
     {

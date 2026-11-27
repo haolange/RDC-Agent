@@ -187,6 +187,11 @@ export const zhControl = {
   'control.replay.recoveryDescription': '恢复时会按需关闭当前回放并连接原设备，不会自动继续调查。',
   'control.replay.recoveryAction': '恢复原位置',
   'control.replay.recoveryFailed': '无法确认恢复状态',
+  'control.replay.rebuildPending': '回放需要重建',
+  'control.replay.rebuildOwned': '回放已隔离，调查会自动重建',
+  'control.replay.rebuildDescription':
+    '上一次操作的结果无法确认，回放已隔离。重建会在同一设备上重新打开这份抓帧，不会自动继续调查。',
+  'control.replay.rebuildAction': '重建回放',
   'control.replay.refresh': '刷新文件与设备',
   'control.replay.imageLoading': '正在加载图片',
   'control.replay.eventNumber': '事件 {id}',

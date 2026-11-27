@@ -194,7 +194,7 @@ export const RENDERER_INVOKE_CHANNEL_TABLE = {
   'capture:readLivePreview': 'read',
   'capture:getReplayState': 'read',
   'capture:getRecovery': 'read',
-  'capture:restorePrevious': 'high-impact',
+  'capture:recover': 'high-impact',
   'capture:applyReplayEvent': 'mutation',
   'capture:refreshFrame': 'mutation',
 

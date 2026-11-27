@@ -89,6 +89,7 @@ function cloneToolCall(toolCall: ConversationToolCall): ConversationToolCall {
       : undefined,
     resourceRefs: toolCall.resourceRefs?.map((resource) => ({ ...resource })),
     imagePreviews: toolCall.imagePreviews?.map((preview) => ({ ...preview })),
+    runtimeRecovery: toolCall.runtimeRecovery ? { ...toolCall.runtimeRecovery } : undefined,
     approval: toolCall.approval
       ? {
           ...toolCall.approval,
@@ -481,6 +482,7 @@ export function upsertRuntimeToolCall(
       imagePreviews: patch.imagePreviews?.map((preview) => ({ ...preview })),
       hookDiagnostics: patch.hookDiagnostics?.map((diagnostic) => ({ ...diagnostic })),
       error: patch.error,
+      runtimeRecovery: patch.runtimeRecovery,
       approval: patch.approval ? { ...patch.approval } : undefined,
       executionStartedAt: patch.executionStartedAt,
       displayOrder: becomesVisible ? nextDisplayOrder(nextTrace) : undefined,

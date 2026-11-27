@@ -31,7 +31,7 @@ const ZH = {
   taskUnsettled:
     '模型已经给出答复，但本轮还有没收尾的任务。应用已把它们标为受阻并保留证据；请查看任务状态，说明完成或受阻的原因后继续。',
   rdcRecoveryBlocked:
-    '回放进程卡住或丢失后，应用没能按记录的进程退出自动重建现场，本轮已停止。capture 保持隔离，复制详情里有具体原因；可以在 Capture 中恢复，或关闭后重新打开。',
+    '调查开始前，应用没能恢复这份 capture 的回放，本轮在运行任何工具之前就停止了。复制详情里有具体原因；可以在 Capture 中恢复或重建回放，无法重建时重启应用后再继续。',
   imageUnsupported: '{agent} 当前的模型不接受图片附件。请换一个支持图片输入的模型后重试。',
   attachmentRejected: '附件没能用于本次请求。请移除无效的附件后重试。',
   requestAuth: '{agent} 使用 {model} 时认证或权限失败。请检查账号的 API Key、登录状态或模型权限后重试。',
@@ -88,7 +88,7 @@ const EN: Record<DiagnosticTextKey, string> = {
   taskUnsettled:
     'The model answered while tasks in this turn were still open. They are marked blocked with their evidence kept; check the tasks, state why each is done or blocked, and continue.',
   rdcRecoveryBlocked:
-    "The replay process got stuck or was lost, and its recorded exits didn't allow an automatic rebuild, so this turn stopped. The capture stays isolated and the copied details name the reason. Recover it from Capture, or close and reopen it.",
+    "The capture's replay couldn't be recovered before the investigation started, so this turn stopped before running any tool. The copied details name the reason. Recover or rebuild the replay in Capture, or restart the app if it can't be rebuilt, then continue.",
   imageUnsupported:
     'The current model for {agent} does not accept images. Switch to a model with image input and try again.',
   attachmentRejected: 'An attachment could not be used for this request. Remove it and try again.',

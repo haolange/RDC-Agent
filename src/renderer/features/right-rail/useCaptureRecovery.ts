@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getCaptureRecovery, restorePreviousCapture, type CaptureScope } from './capturePanelActions';
+import { getCaptureRecovery, recoverCapture, type CaptureScope } from './capturePanelActions';
 import type { CaptureRecoveryStatus, CaptureReplayState } from '@shared/types/captureReplay';
 
 export function useCaptureRecovery(scope: CaptureScope, revision: number | undefined) {
@@ -29,7 +29,7 @@ export function useCaptureRecovery(scope: CaptureScope, revision: number | undef
     async (bindingGeneration: number): Promise<CaptureReplayState | null> => {
       setError(null);
       try {
-        const state = await restorePreviousCapture({ ...scope, bindingGeneration });
+        const state = await recoverCapture({ ...scope, bindingGeneration });
         await refresh();
         return state;
       } catch (reason) {
@@ -39,5 +39,5 @@ export function useCaptureRecovery(scope: CaptureScope, revision: number | undef
     },
     [refresh, scope],
   );
-  return { status, error, restore };
+  return { status, error, recover: restore };
 }

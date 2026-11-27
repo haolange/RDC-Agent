@@ -283,6 +283,11 @@ export const enChat = {
   'chat.workProcessReviewIncomplete': 'Review incomplete',
   'chat.workProcessNotExecuted': 'Action not executed',
   'chat.workProcessFailedChecks': 'Not met: {checks}',
+  'chat.runtimeRecovery.rebuilt':
+    'The replay was rebuilt automatically. Experiments in progress were interrupted and need a new baseline.',
+  'chat.runtimeRecovery.askUser':
+    "The replay couldn't be rebuilt automatically: {reason} It needs you before it can continue.",
+  'chat.runtimeRecovery.restart': "The replay couldn't be rebuilt automatically: {reason} Restart the app to continue.",
   'chat.admissionCheck.authorized': 'Plan authorization',
   'chat.admissionCheck.target-matches': 'Target matches the plan',
   'chat.admissionCheck.effects-bounded': 'Effects within scope',
