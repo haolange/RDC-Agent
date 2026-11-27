@@ -202,6 +202,18 @@ const SettingsPatchOpSchema = z.union([
       })
       .strict(),
   ]),
+  z.discriminatedUnion('field', [
+    z
+      .object({ op: z.literal('agentModels.setReview'), field: z.literal('model'), value: agentModelId.nullable() })
+      .strict(),
+    z
+      .object({
+        op: z.literal('agentModels.setReview'),
+        field: z.literal('reasoningLevel'),
+        value: reasoningSelection.nullable(),
+      })
+      .strict(),
+  ]),
   agentModelFieldValue({ op: z.literal('agentModels.setAgentField'), agentId: agentProfileId }),
   z
     .object({

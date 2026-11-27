@@ -122,6 +122,8 @@ export const enErrors = {
   'errors.PERMISSION_REVIEW_FAILED': "The review request failed, so the action wasn't run.",
   'errors.PERMISSION_REVIEW_INCOMPLETE': "The reviewer didn't reach a decision, so the action wasn't run.",
   'errors.PERMISSION_REVIEW_INVALID': "The reviewer's answer couldn't be read, so the action wasn't run.",
+  'errors.PERMISSION_REVIEW_ROUTE_UNAVAILABLE':
+    "The auto-review model in Settings › Agents isn't available, so the action wasn't run.",
   'errors.PERMISSION_REVIEW_SENSITIVE_INPUT':
     "The action contains credentials, so it can't be sent for automatic review.",
   'errors.PERMISSION_REVIEW_TIMEOUT': "The reviewer didn't answer in time, so the action wasn't run.",

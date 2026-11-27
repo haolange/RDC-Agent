@@ -27,5 +27,10 @@ export function sanitizeAgentModelSettings(raw: unknown): AgentModelSettings {
     const sanitized = sanitizeBinding(binding);
     if (sanitized.model || sanitized.reasoningLevel) byAgent[agentId] = sanitized;
   }
-  return { default: sanitizeBinding(value.default), byAgent };
+  const review = sanitizeBinding(value.review);
+  return {
+    default: sanitizeBinding(value.default),
+    byAgent,
+    ...(review.model || review.reasoningLevel ? { review } : {}),
+  };
 }

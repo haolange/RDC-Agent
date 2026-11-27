@@ -28,7 +28,7 @@ export interface SettingsPatchView {
 
 type OpOf<K extends SettingsPatchOp['op']> = Extract<SettingsPatchOp, { op: K }>;
 export type AgentModelPatchOp = OpOf<
-  'agentModels.setDefault' | 'agentModels.setAgentField' | 'agentModels.clearAgentField'
+  'agentModels.setDefault' | 'agentModels.setAgentField' | 'agentModels.clearAgentField' | 'agentModels.setReview'
 >;
 
 export const isAgentModelPatchOp = (op: SettingsPatchOp): op is AgentModelPatchOp => op.op.startsWith('agentModels.');
@@ -72,16 +72,26 @@ function withField(
   return next;
 }
 
-/** One field of one binding; an Agent binding left without fields is removed, so the default applies again. */
+const isEmptyBinding = (binding: AgentModelBinding): boolean => !binding.model && !binding.reasoningLevel;
+
+/**
+ * One field of one binding. An Agent or auto-review binding left without fields is removed, so the default applies
+ * again.
+ */
 export function applyAgentModelOp(settings: AgentModelSettings, op: AgentModelPatchOp): AgentModelSettings {
   if (op.op === 'agentModels.setDefault') {
     return { ...settings, default: withField(settings.default, op.field, op.value) };
   }
+  if (op.op === 'agentModels.setReview') {
+    const { review: _previous, ...rest } = settings;
+    const review = withField(settings.review ?? {}, op.field, op.value);
+    return isEmptyBinding(review) ? rest : { ...rest, review };
+  }
   const value = op.op === 'agentModels.setAgentField' ? op.value : null;
   const binding = withField(settings.byAgent[op.agentId] ?? {}, op.field, value);
   const byAgent = { ...settings.byAgent };
-  if (binding.model || binding.reasoningLevel) byAgent[op.agentId] = binding;
-  else delete byAgent[op.agentId];
+  if (isEmptyBinding(binding)) delete byAgent[op.agentId];
+  else byAgent[op.agentId] = binding;
   return { ...settings, byAgent };
 }
 
@@ -114,11 +124,12 @@ const sameBinding = (left: AgentModelBinding | undefined, right: AgentModelBindi
 export function diffAgentModels(before: AgentModelSettings, after: AgentModelSettings): AgentModelChanges | undefined {
   const changes: AgentModelChanges = {};
   if (!sameBinding(before.default, after.default)) changes.default = after.default;
+  if (!sameBinding(before.review, after.review)) changes.review = after.review ?? null;
   for (const agentId of new Set([...Object.keys(before.byAgent), ...Object.keys(after.byAgent)])) {
     if (sameBinding(before.byAgent[agentId], after.byAgent[agentId])) continue;
     (changes.byAgent ??= {})[agentId] = after.byAgent[agentId] ?? null;
   }
-  return changes.default || changes.byAgent ? changes : undefined;
+  return changes.default || changes.byAgent || changes.review !== undefined ? changes : undefined;
 }
 
 /** Applies committed binding changes to Agent model settings. */
@@ -128,5 +139,6 @@ export function applyAgentModelChanges(settings: AgentModelSettings, changes: Ag
     if (binding) byAgent[agentId] = binding;
     else delete byAgent[agentId];
   }
-  return { default: changes.default ?? settings.default, byAgent };
+  const review = changes.review === undefined ? settings.review : changes.review;
+  return { default: changes.default ?? settings.default, byAgent, ...(review ? { review } : {}) };
 }

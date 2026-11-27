@@ -105,6 +105,7 @@ export const zhErrors: Record<keyof typeof enErrors, string> = {
   'errors.PERMISSION_REVIEW_FAILED': '审核请求失败，操作未执行。',
   'errors.PERMISSION_REVIEW_INCOMPLETE': '审核未得出结论，操作未执行。',
   'errors.PERMISSION_REVIEW_INVALID': '无法读取审核结果，操作未执行。',
+  'errors.PERMISSION_REVIEW_ROUTE_UNAVAILABLE': '设置 › 智能体中的自动审查模型不可用，操作未执行。',
   'errors.PERMISSION_REVIEW_SENSITIVE_INPUT': '操作包含凭据，不能送去自动审核。',
   'errors.PERMISSION_REVIEW_TIMEOUT': '审核未及时答复，操作未执行。',
   'errors.PERMISSION_REVIEW_UNAVAILABLE': '没有可用的审核者，操作未执行。',

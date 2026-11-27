@@ -276,6 +276,8 @@ export const zhSettings = {
   'settings.agentReasoningDefault': '模型默认',
   'settings.agentDefaultModelTitle': '默认模型',
   'settings.agentDefaultModelHint': '没有单独设置模型或推理档位的智能体使用这里的选择。',
+  'settings.agentReviewModelTitle': '自动审查模型',
+  'settings.agentReviewModelHint': '“自动审查”模式下判断工具调用是否在你批准的范围内；未设置时使用默认模型。',
   'settings.agentModelNotSet': '未设置',
   'settings.agentModelUseDefault': '跟随默认（{model}）',
   'settings.agentReasoningFollowDefault': '跟随默认',

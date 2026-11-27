@@ -49,8 +49,8 @@
       "complexity": 60
     },
     "src/main/agent-runtime/orchestration/TurnPreparationService.ts": {
-      "lines": 434,
-      "complexity": 51
+      "lines": 418,
+      "complexity": 47
     },
     "src/main/agent-runtime/permissions/AgentPermissionPolicy.ts": {
       "lines": 155,
@@ -274,7 +274,7 @@
       "lines": 179
     },
     "src/renderer/features/settings/SettingsModal/sections/AgentsSettings.tsx": {
-      "lines": 211
+      "lines": 206
     },
     "src/renderer/features/settings/SettingsModal/sections/HooksSettings.tsx": {
       "lines": 169

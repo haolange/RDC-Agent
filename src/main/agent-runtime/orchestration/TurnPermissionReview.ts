@@ -5,6 +5,7 @@ import {
 } from '../permissions/PermissionReviewAuthority';
 import { executePermissionReview, type PermissionReviewer } from '../permissions/PermissionReviewRuntime';
 import { TurnAdmission } from '../permissions/PermissionAdmission';
+import { withPermissionReviewRoute } from '../permissions/PermissionReviewRoute';
 import type { AgentTurnRun } from './AgentTurnRunner';
 
 /**
@@ -16,7 +17,7 @@ export function createTurnPermissionReview(run: AgentTurnRun): {
   reviewPermission: PermissionReviewer;
 } {
   const { input, preparedRuntime, requestPlan, turnHandle, executionScopeId } = run;
-  const { promptPlan, routeCapability, effectivePlan, approvedExecution } = preparedRuntime;
+  const { promptPlan, effectivePlan, approvedExecution } = preparedRuntime;
   const admission = new TurnAdmission({
     sessionId: executionScopeId,
     projectId: input.projectId ?? null,
@@ -37,23 +38,28 @@ export function createTurnPermissionReview(run: AgentTurnRun): {
       }),
   });
   const reviewPermission: PermissionReviewer = (action, signal) =>
-    executePermissionReview({
-      sessionId: executionScopeId,
-      plan: requestPlan,
-      credentialHandle: preparedRuntime.credentialHandle,
-      reasoning: routeCapability.reasoningContract,
-      evidence: permissionReviewEvidence(run.slot?.agent.messages ?? [], executionScopeId, action.arguments),
-      authority: permissionReviewAuthority({
-        sessionId: executionScopeId,
-        messages: input.initialMessages ?? [],
-        currentRequest: input.content,
-        promptPlan,
-        workspace: effectivePlan.projectRootPath,
-        agentId: input.agentId,
-        delegated: !!effectivePlan.delegationCapsule,
-      }),
-      action,
-      signal,
-    });
+    withPermissionReviewRoute(
+      preparedRuntime.permissionReview,
+      { providerId: requestPlan.providerId, credentialHandle: preparedRuntime.credentialHandle },
+      (route, credentialHandle) =>
+        executePermissionReview({
+          sessionId: executionScopeId,
+          plan: route.requestPlan,
+          credentialHandle,
+          reasoning: route.reasoning,
+          evidence: permissionReviewEvidence(run.slot?.agent.messages ?? [], executionScopeId, action.arguments),
+          authority: permissionReviewAuthority({
+            sessionId: executionScopeId,
+            messages: input.initialMessages ?? [],
+            currentRequest: input.content,
+            promptPlan,
+            workspace: effectivePlan.projectRootPath,
+            agentId: input.agentId,
+            delegated: !!effectivePlan.delegationCapsule,
+          }),
+          action,
+          signal,
+        }),
+    );
   return { admission, reviewPermission };
 }
