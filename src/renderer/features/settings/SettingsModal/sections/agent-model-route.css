@@ -92,6 +92,18 @@
   align-items: start;
 }
 
+/* The default and auto-review rows end in one control column, so their pickers line up. */
+.settings-agent-defaults > .settings-field.is-row > .settings-field-control {
+  flex: 0 0 20rem;
+  min-width: 0;
+}
+
+@container settings-panel (max-width: 36rem) {
+  .settings-agent-defaults > .settings-field.is-row > .settings-field-control {
+    flex-basis: auto;
+  }
+}
+
 /* Facts about one Agent profile file shown before acting on it (delete, trust). */
 .settings-agent-file-facts {
   display: grid;
