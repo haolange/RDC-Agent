@@ -247,6 +247,7 @@ export const enChat = {
   'chat.workProcessTaskStatus.pending': 'Pending',
   'chat.workProcessTaskStatus.in_progress': 'In progress',
   'chat.workProcessTaskStatus.blocked': 'Blocked',
+  'chat.workProcessTaskStatus.partial': 'Partly done',
   'chat.taskWaitingDependencies': 'Waiting for prerequisites',
   'chat.taskUntitled': 'Untitled task',
   'chat.taskDependency.unfinished': 'Waiting for: {title}',

@@ -186,7 +186,10 @@ export class TaskRegistry extends TaskExecutionLedger {
         if (active && !isTerminalExecutionStatus(active.status))
           throw new Error('Settle or cancel the active execution before blocking its task.');
       }
-      if (next === 'completed') await this.assertCanComplete(task, updates.result);
+      if (next === 'completed') {
+        await this.assertCanComplete(task, updates.result);
+        await this.assertResultUnchallenged(task, updates.result);
+      }
       if (semanticsChanged && task.currentExecutionId) {
         const active = await this.store.loadExecution(task.currentExecutionId);
         if (active && !isTerminalExecutionStatus(active.status))
@@ -327,6 +330,7 @@ export class TaskRegistry extends TaskExecutionLedger {
         await assertTaskExecutionCompletion(task, execution, this.store);
         await assertIndependentReviewResult(task, options.result, this.store);
         await this.assertCompletionClosure(task);
+        await this.assertResultUnchallenged(task, options.result);
       }
       execution.status = options.status;
       execution.result = options.result;

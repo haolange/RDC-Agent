@@ -34,6 +34,9 @@
 .task-status-marker.is-completed {
   --task-status-color: var(--token-task-done);
 }
+.task-status-marker.is-partial {
+  --task-status-color: var(--token-task-done);
+}
 .task-status-marker.is-blocked {
   --task-status-color: var(--token-task-blocked);
 }

@@ -240,6 +240,7 @@ export const zhChat = {
   'chat.workProcessTaskStatus.pending': '待开始',
   'chat.workProcessTaskStatus.in_progress': '进行中',
   'chat.workProcessTaskStatus.blocked': '受阻',
+  'chat.workProcessTaskStatus.partial': '部分完成',
   'chat.taskWaitingDependencies': '等待前置任务',
   'chat.taskUntitled': '未命名任务',
   'chat.taskDependency.unfinished': '等待前置任务：{title}',

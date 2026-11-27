@@ -51,6 +51,24 @@ it('preserves active ownership on a pending request and carries consumption into
   expect(child).toMatchObject({ mode: 'subagent', generation: 2, budget: { maxToolCalls: 30, toolCalls: 2 } });
 });
 
+it('keeps a Task from completing while an open Challenge disputes what its result cites', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'rdc-tasks-'));
+  roots.push(dir);
+  let open = [{ challengeId: 'challenge-scope', followUp: 'Narrow the claim to the sampled region.' }];
+  const registry = new TaskRegistry(dir, { openChallengesForResult: async () => open });
+  const [task] = await registry.createTasks([{ subject: 'Locate the first bad event' }]);
+  const first = await registry.startExecution(task.id, { mode: 'direct' });
+  const result = { disposition: 'completed' as const, summary: 'Located.', outputs: {} };
+  await expect(
+    registry.settleExecution(first.id, { status: 'completed', expectedGeneration: first.generation, result }),
+  ).rejects.toThrow('challenge-scope (Narrow the claim to the sampled region.)');
+  expect(await registry.getTask(task.id)).toMatchObject({ status: 'in_progress' });
+
+  open = [];
+  await registry.settleExecution(first.id, { status: 'completed', expectedGeneration: first.generation, result });
+  expect(await registry.getTask(task.id)).toMatchObject({ status: 'completed' });
+});
+
 describe('TaskRegistry', () => {
   it('rejects direct execution when a Task requires isolated delegation', async () => {
     const registry = await createRegistry();

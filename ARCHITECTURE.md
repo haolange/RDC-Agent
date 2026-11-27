@@ -686,7 +686,7 @@ Session 五卡：
 
 - **Tasks** 消费 canonical `taskProjection`，是单一规范列表（`RightPanelViewModel.tasks: TaskRailItem[]`）。
   - 按创建序排列，已完成项就地保留，与 transcript 同序同态；状态与标题分离，完成不划线，行内不显示序号；执行事实只在悬停与详情呈现。
-  - 每项带 TaskRegistry 状态 `status` 与展示态 `displayState`：未完成、未取消的 Task 当前执行为 `failed` / `interrupted` 时显示为 `failed`，其余等于 `status`。
+  - 每项带 TaskRegistry 状态 `status` 与展示态 `displayState`：未完成、未取消的 Task 当前执行为 `failed` / `interrupted` 时显示为 `failed`；以 partial 结算的 Task（记录为 `blocked`）显示为 `partial`，即「部分完成」；其余等于 `status`。
   - `execution` 只取当前执行记录的事实（`mode`、`dispatch` wait／background、实际 Agent、模型与推理档位），不从文本推断。
 - **Artifacts** 只投影 main-owned `rdc.investigation` Investigation Artifacts（不是 Working Directory 扫描，也不是 `output_register`）。`InvestigationArtifactRow` 携带完整 `contentHash`（renderer 只缩显）。
 - **Outputs** 只接受 `output_register` 发布的用户输出文件，拒绝 inputs 与 plan；Investigation Artifacts 不混进 Outputs。

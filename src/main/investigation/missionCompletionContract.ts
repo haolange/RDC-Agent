@@ -10,7 +10,7 @@ import { InvestigationArtifactService, investigationArtifactService } from './In
 import { InvestigationError } from './investigationErrors';
 import { hashesEqual } from './investigationHash';
 import { assertOptimizerExperimentClose, assertReportContractPresent } from './investigationInvariants';
-import { openReportChallenges } from './reportChallengeEligibility';
+import { openReportChallenges } from './challengeEligibility';
 import type { InvestigationReadResult } from './investigationArtifactWrite';
 
 export const MISSION_COMPLETION_DENIED = 'MISSION_COMPLETION_DENIED';
