@@ -11,6 +11,7 @@ import { PermissionReviewError } from './PermissionReviewRuntime';
 import type { PermissionReviewer, PermissionReviewAction, PermissionReviewVerdict } from './PermissionReviewRuntime';
 import type { AdmissionRoute } from './PermissionAdmission';
 import type { AgentRole } from '@shared/types/agent';
+import type { ToolApprovalEscalation } from '@shared/constants/admissionChecks';
 import type { AgentApprovalEventPayload, AgentEvent } from '@shared/types/agentRuntime';
 import type { AgentTool } from '../agent/AgentTool';
 
@@ -27,6 +28,8 @@ export interface ToolApprovalRequestInput {
   context: AgentEventBridgeContext;
   onEvent?: (event: AgentEvent) => void;
   signal?: AbortSignal;
+  /** Set when an auto-review that could not decide hands this action to the user. */
+  escalation?: ToolApprovalEscalation;
 }
 
 export interface ToolApprovalAnswerInput {
@@ -104,6 +107,7 @@ export class AgentToolApprovalRequestService {
         question: input.reason,
         options: ['Approve once', 'Deny'],
         risk: input.risk,
+        ...(input.escalation ? { escalatedFrom: input.escalation } : {}),
       });
     });
   }
@@ -199,22 +203,24 @@ export class AgentToolApprovalRequestService {
       verdict = { verdict: 'deny', failedChecks: [], reason: error.message };
     }
     const approved = verdict.verdict === 'allow';
-    this.emit(synthetic, 'approval.answered', {
-      approvalId,
-      title: `Auto-review ${input.toolName}`,
-      status: reviewCancelled ? 'cancelled' : approved ? 'approved' : 'rejected',
-      reason: verdict.reason,
-      kind: 'tool',
-      toolCallId: input.toolCallId,
-      toolName: input.toolName,
-      answer: verdict.reason,
-      risk: input.risk,
-      reviewer: 'auto_review',
-      reviewMethod,
-      verdict: verdict.verdict,
-      failedChecks: verdict.failedChecks,
-      errorCode,
-    });
+    // An undecidable review settles nothing on the card: the user approval that takes it over replaces it.
+    if (verdict.verdict !== 'undecidable' || errorCode)
+      this.emit(synthetic, 'approval.answered', {
+        approvalId,
+        title: `Auto-review ${input.toolName}`,
+        status: reviewCancelled ? 'cancelled' : approved ? 'approved' : 'rejected',
+        reason: verdict.reason,
+        kind: 'tool',
+        toolCallId: input.toolCallId,
+        toolName: input.toolName,
+        answer: verdict.reason,
+        risk: input.risk,
+        reviewer: 'auto_review',
+        reviewMethod,
+        verdict: verdict.verdict,
+        failedChecks: verdict.failedChecks,
+        errorCode,
+      });
     if (modeCancelled) throw new PermissionModeChangedError();
     return { ...verdict, reviewMethod, ...(errorCode ? { errorCode } : {}) };
   }
@@ -244,6 +250,7 @@ export class AgentToolApprovalRequestService {
       risk: pending.risk,
       sessionId: pending.sessionId,
       turnId: pending.turnId,
+      ...(pending.escalation ? { escalatedFrom: 'auto-review' as const } : {}),
     });
     this.deletePending(pending);
     this.emit(pending, 'approval.answered', {
@@ -256,6 +263,7 @@ export class AgentToolApprovalRequestService {
       toolName: pending.toolName,
       answer: input.approved ? '已批准一次' : '用户已拒绝',
       risk: pending.risk,
+      ...(pending.escalation ? { escalatedFrom: pending.escalation } : {}),
     });
     pending.resolve(input.approved);
   }

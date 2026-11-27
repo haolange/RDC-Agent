@@ -1,4 +1,4 @@
-import type { AdmissionCheck, PermissionReviewVerdictKind } from '../constants/admissionChecks';
+import type { AdmissionCheck, PermissionReviewVerdictKind, ToolApprovalEscalation } from '../constants/admissionChecks';
 /**
  * Shared Agent Runtime event types for the IPC contract.
  *
@@ -139,6 +139,8 @@ export interface AgentApprovalEventPayload {
   /** Auto-review only: the settled verdict and the admission checks it named. */
   verdict?: PermissionReviewVerdictKind;
   failedChecks?: AdmissionCheck[];
+  /** A user approval the auto-review handed over because it could not decide, with the checks it could not establish. */
+  escalatedFrom?: ToolApprovalEscalation;
   errorCode?: string;
   delegatedRequest?: { executionId: string; childSessionId: string; turnId: string };
   approvalId: string;

@@ -1,4 +1,4 @@
-import type { AdmissionCheck, PermissionReviewVerdictKind } from '../constants/admissionChecks';
+import type { AdmissionCheck, PermissionReviewVerdictKind, ToolApprovalEscalation } from '../constants/admissionChecks';
 import type { InterruptionCause, TurnStopCause } from './lifecycle';
 import type { AgentRole } from './agent';
 import type { TaskDependencyWait } from './taskExecution';
@@ -230,6 +230,8 @@ export interface ConversationToolApproval {
   /** Auto-review only: the settled verdict and the admission checks it named. */
   verdict?: PermissionReviewVerdictKind;
   failedChecks?: AdmissionCheck[];
+  /** A user approval handed over by an auto-review that could not decide. */
+  escalatedFrom?: ToolApprovalEscalation;
   /** Host-confirmed review failure, never parsed from the model's reason. */
   errorCode?: string;
   answer?: string;

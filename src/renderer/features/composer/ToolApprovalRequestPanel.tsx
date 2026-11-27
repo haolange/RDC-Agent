@@ -41,6 +41,15 @@ export const ToolApprovalRequestPanel: React.FC<{
           {t('composer.toolApprovalKicker')}
         </ActiveSignalText>
         <p>{formatToolApprovalReason(request.question, t) || t('chat.approvalRequiredMessage')}</p>
+        {request.escalatedChecks ? (
+          <p className="composer-tool-approval-escalation">
+            {t('composer.toolApprovalEscalated', {
+              checks: request.escalatedChecks
+                .map((check) => t(`chat.admissionCheck.${check}`))
+                .join(t('chat.listSeparator')),
+            })}
+          </p>
+        ) : null}
       </div>
       <div className="composer-tool-approval-meta" aria-label={t('composer.toolApprovalContext')}>
         <span>{toolCategoryLabel(request.toolName, t)}</span>

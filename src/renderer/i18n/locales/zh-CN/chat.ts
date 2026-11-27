@@ -286,6 +286,8 @@ export const zhChat = {
   'chat.admissionCheck.prior-reverted': '上次修改已撤回',
   'chat.admissionCheck.instances-remaining': '剩余授权次数',
   'chat.workProcessManualReviewMeta': '人工审批',
+  'chat.workProcessEscalatedMeta': '自动审查无法判断 · 询问你',
+  'chat.workProcessEscalatedMessage': '自动审查无法确认：{checks}',
   'chat.workProcessGroupAsk': '询问',
   'chat.workProcessGroupSearch': '搜索',
   'chat.workProcessGroupGit': 'Git',

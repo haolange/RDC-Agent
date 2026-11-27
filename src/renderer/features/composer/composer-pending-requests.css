@@ -59,6 +59,10 @@
   overflow-wrap: anywhere;
 }
 
+.composer-tool-approval-header p.composer-tool-approval-escalation {
+  color: var(--token-text-secondary);
+}
+
 .composer-user-input-question-description {
   color: var(--token-text-secondary);
   font-size: var(--type-meta-size);

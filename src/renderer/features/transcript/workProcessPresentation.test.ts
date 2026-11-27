@@ -121,6 +121,30 @@ it.each([
   },
 );
 
+it('shows a user approval handed over by an undecidable auto-review as such, with what it could not confirm', () => {
+  const row = createToolRowForPresentation(
+    {
+      id: 'escalated',
+      toolName: 'shell',
+      status: 'pending',
+      startedAt: now,
+      approval: {
+        approvalId: 'tool-approval-escalated',
+        status: 'pending',
+        risk: 'medium',
+        reason: 'Owned replay shader change requires authorization review.',
+        escalatedFrom: { reviewer: 'auto_review', reviewMethod: 'model', failedChecks: ['baseline-recorded'] },
+        requestedAt: now,
+      },
+    },
+    t,
+  );
+  if (row.type !== 'tool') throw new Error('Expected tool row');
+  expect(row.approval?.message).toBe('自动审查无法确认：基线已记录');
+  expect(row.approval?.metaLines).toContain('自动审查无法判断 · 询问你');
+  expect(row.approval?.metaLines).not.toContain('人工审批');
+});
+
 it('keeps a post-approval native error separate from an operation-preflight rejection', () => {
   const row = createToolRowForPresentation(
     {

@@ -1,7 +1,11 @@
 import { cancelWorkTrace } from '@shared/conversation/cancelWorkTrace';
 import { loopTextItems, loopThinkingItems, sameProviderBlock, settleTextPhase } from '@shared/conversation/loopItems';
 import { nowMs } from '@shared/utils/id';
-import { isAdmissionCheck, isPermissionReviewVerdict } from '@shared/constants/admissionChecks';
+import {
+  isAdmissionCheck,
+  isPermissionReviewVerdict,
+  parseToolApprovalEscalation,
+} from '@shared/constants/admissionChecks';
 import { normalizeToolName } from '../orchestration/RuntimeToolPolicy';
 import { normalizeWorkBlockKind, providerOutputRefKey } from '../../sessions/store/StoredWorkTrace';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
@@ -85,7 +89,20 @@ function cloneToolCall(toolCall: ConversationToolCall): ConversationToolCall {
       : undefined,
     resourceRefs: toolCall.resourceRefs?.map((resource) => ({ ...resource })),
     imagePreviews: toolCall.imagePreviews?.map((preview) => ({ ...preview })),
-    approval: toolCall.approval ? { ...toolCall.approval } : undefined,
+    approval: toolCall.approval
+      ? {
+          ...toolCall.approval,
+          ...(toolCall.approval.failedChecks ? { failedChecks: [...toolCall.approval.failedChecks] } : {}),
+          ...(toolCall.approval.escalatedFrom
+            ? {
+                escalatedFrom: {
+                  ...toolCall.approval.escalatedFrom,
+                  failedChecks: [...toolCall.approval.escalatedFrom.failedChecks],
+                },
+              }
+            : {}),
+        }
+      : undefined,
   };
 }
 
@@ -556,6 +573,7 @@ export function upsertRuntimeToolApproval(
     reviewMethod?: unknown;
     verdict?: unknown;
     failedChecks?: unknown;
+    escalatedFrom?: unknown;
     errorCode?: unknown;
     answer?: unknown;
   },
@@ -582,6 +600,8 @@ export function upsertRuntimeToolApproval(
   if (input.reviewMethod === 'rule' || input.reviewMethod === 'model') approval.reviewMethod = input.reviewMethod;
   if (isPermissionReviewVerdict(input.verdict)) approval.verdict = input.verdict;
   if (Array.isArray(input.failedChecks)) approval.failedChecks = input.failedChecks.filter(isAdmissionCheck);
+  const escalatedFrom = parseToolApprovalEscalation(input.escalatedFrom);
+  if (escalatedFrom) approval.escalatedFrom = escalatedFrom;
   if (typeof input.errorCode === 'string' && input.errorCode) approval.errorCode = input.errorCode;
   const answer = stringifyApprovalField(input.answer);
   if (answer) approval.answer = answer;

@@ -213,7 +213,7 @@ const createToolApprovalPresentation = (
   const message =
     approval.status === 'cancelled' && approval.errorCode === 'PERMISSION_MODE_CHANGED'
       ? t('chat.workProcessApprovalModeChangedMessage')
-      : (isAutoReview && autoReviewRefusal(approval, t)) ||
+      : (isAutoReview ? autoReviewRefusal(approval, t) : escalationMessage(approval, t)) ||
         compactText(messageSource || fallbackApprovalMessage(approval.status, t), 300);
   const riskKey =
     approval.risk === 'low'
@@ -231,7 +231,9 @@ const createToolApprovalPresentation = (
         : approval.reviewMethod === 'model'
           ? t('chat.workProcessModelReview')
           : t('chat.workProcessAutoReviewMeta')
-      : t('chat.workProcessManualReviewMeta'),
+      : approval.escalatedFrom
+        ? t('chat.workProcessEscalatedMeta')
+        : t('chat.workProcessManualReviewMeta'),
     approval.status === 'rejected' ? t('chat.workProcessNotExecuted') : '',
   ].filter(Boolean);
 
@@ -257,6 +259,16 @@ const autoReviewRefusal = (approval: ConversationToolApproval, t: Translator): s
     ? humanizeError(new AppError(approval.errorCode), t)
     : '';
 };
+
+/** While the user decides an action the auto-review handed over, the card says what it could not establish. */
+const escalationMessage = (approval: ConversationToolApproval, t: Translator): string =>
+  approval.status === 'pending' && approval.escalatedFrom?.failedChecks.length
+    ? t('chat.workProcessEscalatedMessage', {
+        checks: approval.escalatedFrom.failedChecks
+          .map((check) => t(`chat.admissionCheck.${check}`))
+          .join(t('chat.listSeparator')),
+      })
+    : '';
 
 const getToolApprovalVerb = (approval: ConversationToolApproval, isAutoReview: boolean, t: Translator): string => {
   const { status, reviewMethod, errorCode } = approval;

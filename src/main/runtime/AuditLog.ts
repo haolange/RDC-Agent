@@ -27,6 +27,8 @@ export type AuditEvent =
       verdict?: PermissionReviewVerdictKind;
       failedChecks?: readonly AdmissionCheck[];
       reviewMethod?: 'rule' | 'model';
+      /** A user decision on an action the auto-review could not decide. */
+      escalatedFrom?: 'auto-review';
     }
   | { kind: 'permission-settings'; from: AgentPermissionSettings; to: AgentPermissionSettings }
   /** An outbound request the person asked for: an image the model linked whose URL no non-model source supplied. */

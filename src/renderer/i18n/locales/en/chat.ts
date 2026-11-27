@@ -293,6 +293,8 @@ export const enChat = {
   'chat.admissionCheck.prior-reverted': 'Previous change reverted',
   'chat.admissionCheck.instances-remaining': 'Remaining approved uses',
   'chat.workProcessManualReviewMeta': 'Manual approval',
+  'chat.workProcessEscalatedMeta': 'Auto-review could not decide · asked you',
+  'chat.workProcessEscalatedMessage': "Auto-review couldn't confirm: {checks}",
   'chat.workProcessGroupAsk': 'Ask',
   'chat.workProcessGroupSearch': 'Search',
   'chat.workProcessGroupGit': 'Git',

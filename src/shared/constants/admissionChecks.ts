@@ -47,3 +47,22 @@ export function isAdmissionCheck(value: unknown): value is AdmissionCheck {
 export function isPermissionReviewVerdict(value: unknown): value is PermissionReviewVerdictKind {
   return value === 'allow' || value === 'deny' || value === 'undecidable';
 }
+
+/** An auto-review that could not decide hands the action to the user once, naming what it could not establish. */
+export interface ToolApprovalEscalation {
+  reviewer: 'auto_review';
+  reviewMethod: 'rule' | 'model';
+  failedChecks: AdmissionCheck[];
+}
+
+export function parseToolApprovalEscalation(value: unknown): ToolApprovalEscalation | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const { reviewer, reviewMethod, failedChecks } = value as Record<string, unknown>;
+  if (
+    reviewer !== 'auto_review' ||
+    (reviewMethod !== 'rule' && reviewMethod !== 'model') ||
+    !Array.isArray(failedChecks)
+  )
+    return undefined;
+  return { reviewer, reviewMethod, failedChecks: failedChecks.filter(isAdmissionCheck) };
+}

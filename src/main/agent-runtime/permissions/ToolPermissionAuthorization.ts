@@ -135,8 +135,28 @@ export async function authorizeToolPermission(
       risk: decision.risk,
       signal,
     });
-    if (!verdict.errorCode) settle?.(verdict);
-    if (verdict.verdict !== 'allow') throw autoReviewDenial(decision.risk, verdict);
+    if (verdict.verdict === 'undecidable' && !verdict.errorCode) {
+      // The one way out of an undecidable review: the user decides this exact call once. Never a mode change.
+      const approved = await agentToolApprovalRequestService.request({
+        ...input.approval,
+        argumentsSha256,
+        reason,
+        risk: decision.risk,
+        signal,
+        escalation: { reviewer: 'auto_review', reviewMethod: verdict.reviewMethod, failedChecks: verdict.failedChecks },
+      });
+      if (!approved) {
+        settle?.(
+          { verdict: 'deny', failedChecks: verdict.failedChecks, reason: 'The user denied this action.' },
+          { byUser: true },
+        );
+        throw new ToolPermissionDenied('User denied this tool call after auto-review could not decide it.');
+      }
+      settle?.({ verdict: 'allow', failedChecks: [], reason: 'The user approved this action once.' });
+    } else {
+      if (!verdict.errorCode) settle?.(verdict);
+      if (verdict.verdict !== 'allow') throw autoReviewDenial(decision.risk, verdict);
+    }
   }
   input.assertLive();
   return decision;
