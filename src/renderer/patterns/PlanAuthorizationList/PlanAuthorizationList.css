@@ -9,20 +9,6 @@
   background: var(--token-surface-sunken);
 }
 
-.plan-authorizations__title {
-  margin: 0;
-  font-size: var(--type-body-size);
-  font-weight: var(--font-semibold);
-  color: var(--token-text-primary);
-}
-
-.plan-authorizations__hint {
-  margin: 0;
-  font-size: var(--type-body-size);
-  line-height: var(--leading-normal);
-  color: var(--token-text-secondary);
-}
-
 .plan-authorizations__list {
   display: flex;
   flex-direction: column;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useI18n } from '../../i18n';
+import { SectionHeader } from '../../ui/SectionHeader';
 import { planAuthorizationText } from './planAuthorizationText';
 import type { PlanAuthorization } from '@shared/types/planInvestigation';
 import './PlanAuthorizationList.css';
@@ -12,8 +13,7 @@ export const PlanAuthorizationList: React.FC<{ authorizations: readonly PlanAuth
   if (!authorizations.length) return null;
   return (
     <section className="plan-authorizations" data-testid="plan-authorizations">
-      <h3 className="plan-authorizations__title">{t('chat.planAuthorizationsTitle')}</h3>
-      <p className="plan-authorizations__hint">{t('chat.planAuthorizationsHint')}</p>
+      <SectionHeader title={t('chat.planAuthorizationsTitle')} description={t('chat.planAuthorizationsHint')} />
       <ul className="plan-authorizations__list">
         {authorizations.map((item) => {
           const text = planAuthorizationText(item, t);
